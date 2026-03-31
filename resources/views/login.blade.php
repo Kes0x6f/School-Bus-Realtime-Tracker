@@ -1,14 +1,28 @@
 @extends('layouts.app')
 
 @section('content')
+<div class="fixed inset-0 w-screen h-screen bg-cover bg-center -z-10"
+        style="background-image: url('/images/jeep.png');">
+</div>
 
-<!-- REMOVE flex wrapper -->
-<!-- REMOVE inner container -->
+<div class="fixed top-0 left-0 w-full z-30 shadow-md">
 
-<div class="container" style="background-image: url('{{ asset('images/bgg.png') }}');">
+    <!-- WHITE TOP STRIP -->
+    <div style="background: white; height: 48px;"></div>
+
+    <!-- BLUE BAR -->
+    <div style="background: #002D62; height: 48px;"></div>
+
+</div>
+
+
+<div class="container relative z-20 pt-20">
+    
+    <!-- Content -->
+    <div class="w-full max-w-md px-4 mx-auto flex flex-col items-center">
 
     <!-- LANDING -->
-    <div id="landing">
+    <div id="landing" class="w-full">
         <div class="card">
             <p class="logoText">Universidad De Dagupan</p>
             <p class="subLabel">E-Bus Tracker</p>
@@ -61,6 +75,7 @@
     </div>
 </div>
 
+</div>
 </div>
 
 

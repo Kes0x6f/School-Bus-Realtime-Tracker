@@ -11,7 +11,7 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 min-h-screen">
     @yield('content')
 </body>
 </html>
