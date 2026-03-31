@@ -28,4 +28,9 @@ class Vehicle extends Model
     {
         return $this->hasOne(Location::class)->latestOfMany('recorded_at');
     }
+
+    public function user()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'user_id');
+    }
 }

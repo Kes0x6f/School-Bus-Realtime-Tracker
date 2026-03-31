@@ -4,7 +4,7 @@
 namespace App\Events;
 
 use App\Models\Vehicle;
-use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Queue\SerializesModels;
@@ -21,7 +21,7 @@ class VehicleLocationUpdated implements ShouldBroadcastNow
 
     public function broadcastOn()
     {
-        return new Channel('vehicle.' . $this->vehicle->id);
+        return new PrivateChannel('vehicle.' . $this->vehicle->id);
     }
 
     public function broadcastAs()

@@ -14,7 +14,7 @@ class VehicleController extends Controller
         $vehicles = Vehicle::get()->map(function ($vehicle) {
 
             $vehicle->status =
-                now()->diffInSeconds($vehicle->last_seen) < 30
+                now()->diffInSeconds($vehicle->last_seen) < 60
                 ? 'active'
                 : 'offline';
 
@@ -23,10 +23,10 @@ class VehicleController extends Controller
 
         return response()->json($vehicles);
     }
-
+//still unused
     public function activeVehicles()
     {
-        $vehicles = Vehicle::where('last_seen', '>=', now()->subMinutes(100000))
+        $vehicles = Vehicle::where('last_seen', '>=', now()->subSeconds(60))
             ->select('id','plate_number','latitude','longitude','speed','last_seen')
             ->get();
 

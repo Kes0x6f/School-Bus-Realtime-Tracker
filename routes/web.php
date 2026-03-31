@@ -1,65 +1,102 @@
 <?php
 
-use App\Events\JeepMoved;
+use App\Http\Controllers\StudentController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\GpsController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Broadcast;
+use App\Models\Vehicle;
+
+
+Broadcast::routes(['middleware' => ['web']]);
+
+require base_path('routes/channels.php');
+
+Route::post('/login', function (Request $request){
+    $credentials = $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+    ]);
+
+    if (Auth::attempt($credentials)) {
+        $request->session()->regenerate();
+
+        $user = Auth::user();
+
+        if ($user->role === 'driver') {
+            return redirect('/driver/dashboard');
+        }
+
+        return redirect('/student/active-jeeps');
+    }
+
+    return back()->withErrors([
+        'email' => 'Invalid credentials',
+    ]);
+});
+
+Route::post('/logout', function (Request $request) {
+    Auth::logout();
+
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+
+    return redirect('/');
+});
 
 Route::get('/', function () {
-    return view('login');
-});
-
-Route::get('/map', function () {
-    return view(view: 'map');
-});
-
-Route::get('/move', function () {
-    event(new JeepMoved(16.351212533761666, 120.3407345106514));
-});
-
-Route::get('/debug-broadcast', function () {
-    event(new App\Events\JeepMoved(16.052, 120.341));
-    return 'event dispatched';
-});
+     return view('login'); 
+})->name('login');
 
 
+Route::get('/driver/dashboard', function () {
+     $vehicle = auth()->user()->vehicle;
 
-/*
-|--------------------------------------------------------------------------
-| MOCK DRIVER
-|--------------------------------------------------------------------------
-*/
+     if (!$vehicle) {
+        abort(403, 'No vehicle assigned to this driver');
+    }
 
-Route::get('/driver', function () {
-    return view('driver.dashboard');
-});
+    return view('driver.dashboard', [
+        'vehicleId' => $vehicle->id
+    ]);
 
-/*
-|--------------------------------------------------------------------------
-| MOCK STUDENT
-|--------------------------------------------------------------------------
-*/
+})->middleware('auth');
 
-Route::get('/student', function () {
+Route::get('/student/active-jeeps', function () {
+    return view('student.active-jeeps');
+})->middleware('auth');
 
-    // Fake active jeeps
-    $jeeps = [
-        (object)[
-            'id' => 1,
-            'route_name' => 'Route A - Mangaldan',
-            'is_full' => false
-        ],
-        (object)[
-            'id' => 2,
-            'route_name' => 'Route B - Calasiao',
-            'is_full' => true
-        ],
-    ];
-
-    return view('student.active-jeeps', compact('jeeps'));
-});
 
 Route::get('/student/track/{id}', function ($id) {
 
+     $vehicle = Vehicle::with('user')->findOrFail($id);
+
     return view('student.track', [
-        'jeepId' => $id
-    ]);});
+        'jeepId' => $id,
+        'vehicle' => $vehicle
+    ]);
+
+});
+
+Route::get('/student/active-jeeps', [StudentController::class, 'active']);
+
+
+use App\Events\VehicleLocationUpdated;
+
+Route::get('/debug-broadcast', function () {
+    $vehicle = Vehicle::first();
+
+    if (!$vehicle) {
+        return "No vehicle found";
+    }
+
+    $vehicle->latitude += 0.0001;
+    $vehicle->longitude += 0.0001;
+    $vehicle->last_seen = now();
+    $vehicle->save();
+
+    event(new VehicleLocationUpdated($vehicle));
+
+    return "Broadcast sent for vehicle ID: " . $vehicle->id;
+});

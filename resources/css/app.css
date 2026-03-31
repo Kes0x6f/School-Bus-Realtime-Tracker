@@ -1,15 +1,311 @@
-@import 'tailwindcss';
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-@source '../**/*.blade.php';
-@source '../**/*.js';
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+.container {
+  flex: 1;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  justify-content: center;
+  align-items: center;
+  display: flex;
+  height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fadeIn {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.slideIn {
+  animation: slideInUp 0.6s ease-out;
+}
+
+.card {
+  width: 88%;
+  background-color: #fff;
+  padding: 25px;
+  border-radius: 24px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  align-items: center;
+  border-top-width: 8px;
+  border-top-color: #002D62;
+}
+.pageLabel {
+  color: #B8860B;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+.pageLabelDark {
+  color: #666;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  margin-top: 10px;
+}
+.busIconContainer {
+  margin-bottom: 30px;
+  align-items: center;
+}
+.busEmoji {
+  font-size: 65px;
+}
+.logoText {
+  font-size: 20px;
+  font-weight: 900;
+  color: #002D62;
+  text-align: center;
+}
+.subLabel {
+  font-size: 18px;
+  color: #B8860B;
+  font-weight: bold;
+  margin-top: 2px;
+  text-align: center;
+}
+.title {
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 25px;
+  color: #1A1A1A;
+}
+.input {
+  width: 100%;
+  border-width: 1.5px;
+  border-color: #EEE;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background-color: #FAFAFA;
+}
+.primaryButton {
+  background: linear-gradient(135deg, #002D62 0%, #004a96 50%, #002D62 100%);
+  width: 100%;
+  padding: 12px;
+  max-width: 300px;
+  border-radius: 12px;
+  margin-top: 10px;
+  color: #fff;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  border: none;
+  box-shadow: 0 8px 16px rgba(0, 45, 98, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.primaryButton:hover {
+  box-shadow: 0 12px 24px rgba(0, 45, 98, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.primaryButton:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 8px rgba(0, 45, 98, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.secondaryButton {
+  background: linear-gradient(135deg, #6c757d 0%, #8a92a3 50%, #6c757d 100%);
+  width: 100%;
+  max-width: 300px;
+  padding: 12px;
+  border-radius: 12px;
+  margin-top: 10px;
+  color: #fff;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  box-shadow: 0 8px 16px rgba(108, 117, 125, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.secondaryButton:hover {
+  box-shadow: 0 12px 24px rgba(108, 117, 125, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.secondaryButton:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.backLink {
+  color: #007bff;
+  cursor: pointer;
+  margin: 10px 0;
+  text-decoration: none;
+  background-color: #f8f9fa;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+.fullScreen {
+  width: 100%;  
+  padding: 20px;
+  box-sizing: border-box;
+  background: #F0F2F5;
+  height: 100vh;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.headerTitle {
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #1A1A1A;
+}
+.jeepCard {
+  background: #fff;
+  padding: 15px;
+  border-radius: 10px;
+  margin: 10px 0;
+  cursor: pointer;
+  border: 1px solid #ddd;
+  text-align: left;
+  width: 100%;
+  max-width: 400px;
+  text-decoration: none;
+  color: inherit;
+}
+.jeepRoute {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0;
+  color: #1A1A1A;
+}
+.jeepDetail {
+  font-size: 14px;
+  color: #666;
+  margin: 5px 0;
+}
+.statusRow {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+.statusBadge {
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  display: inline-block;
+}
+.statusText {
+  margin: 0;
+  color: green;
+  font-weight: bold;
+}
+.backButton {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 20px;
+}
+.routeBox {
+  background: #f8f9fa;
+  padding: 10px;
+  border-radius: 5px;
+  margin: 10px 0;
+}
+.routeHeader {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+.routeText {
+  font-size: 16px;
+  font-weight: bold;
+  margin: 5px 0;
+  color: #1A1A1A;
+}
+.actionButton {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin: 10px 0;
+  width: 100%;
+}
+.btnActive {
+  background-color: #28a745;
+  color: white;
+}
+.btnInactive {
+  background-color: #6c757d;
+  color: white;
+}
+.btnFull {
+  background-color: #dc3545;
+  color: white;
+}
+.btnAvailable {
+  background-color: #ffc107;
+  color: white;
+}
+.mapContainer {
+  height: 400px;
+  height: 70vh;      
+  min-height: 300px;
+  background: #e9ecef;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 10px;
+  margin: 20px 0;
+  max-width: none;
+}
+.mapPlaceholderText {
+  font-size: 24px;
+  color: #666;
+}
+.primaryButtonWide {
+  background-color: #002D62;
+  color: white;
+  border: none;
+  padding: 15px 30px;
+  border-radius: 5px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 20px;
+}
+
+#map {
+  height: 100%;
+  width: 100%;
+  display: block;
 }

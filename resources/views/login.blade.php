@@ -1,23 +1,77 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-sm bg-white rounded-2xl shadow-lg p-6 space-y-4">
+<!-- REMOVE flex wrapper -->
+<!-- REMOVE inner container -->
 
-        <h1 class="text-xl font-bold text-center">Jeep Tracker</h1>
+<div class="container" style="background-image: url('{{ asset('images/bgg.png') }}');">
 
-        <a href="/driver"
-           class="block text-center bg-blue-600 text-white p-3 rounded-xl">
-            Login as Driver
-        </a>
+    <!-- LANDING -->
+    <div id="landing">
+        <div class="card">
+            <p class="logoText">Universidad De Dagupan</p>
+            <p class="subLabel">E-Bus Tracker</p>
 
-        <a href="/student"
-           class="block text-center bg-green-600 text-white p-3 rounded-xl">
-            Login as Student
-        </a>
+            <button onclick="show('studentLogin')" class="primaryButton">
+                Log in as Student
+            </button>
 
+            <button onclick="show('driverLogin')" class="secondaryButton">
+                Log in as Driver
+            </button>
+        </div>
     </div>
 
+<!-- STUDENT LOGIN -->
+<div id="studentLogin" style="display:none;">
+    <div class="card">
+        <p class="title">Student Login</p>
+
+        <form method="POST" action="/login">
+            @csrf
+
+            <input class="input" name="email" placeholder="Email" required>
+            <input class="input" type="password" name="password" placeholder="Password" required>
+
+            <button type="submit" class="secondaryButton">Login</button>
+        </form>   
+
+        <button onclick="show('landing')" class="backLink">
+            ← Return Home
+        </button>
+    </div>
 </div>
+
+<!-- DRIVER LOGIN -->
+<div id="driverLogin" style="display:none;">
+    <div class="card">
+        <p class="title">Driver Login</p>
+            <form method="POST" action="/login">
+                @csrf
+
+                <input class="input" name="email" placeholder="Email" required>
+                <input class="input" type="password" name="password" placeholder="Password" required>
+
+                <button type="submit" class="secondaryButton">Login</button>
+            </form>
+        <button onclick="show('landing')" class="backLink">
+            ← Return Home
+        </button>
+    </div>
+</div>
+
+</div>
+
+
+<script>
+function show(id) {
+    document.getElementById('landing').style.display = 'none';
+    document.getElementById('studentLogin').style.display = 'none';
+    document.getElementById('driverLogin').style.display = 'none';
+
+    document.getElementById(id).style.display = 'block';
+}
+</script>
+
 @endsection

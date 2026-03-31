@@ -11,4 +11,13 @@ window.Echo = new Echo({
     wssPort: 443,
     wsPath: '/app',
     forceTLS: true,
+    withCredentials: true, 
+
+    authEndpoint: '/broadcasting/auth',
+
+    auth: {
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        }
+    }
 });

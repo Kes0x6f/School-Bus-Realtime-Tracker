@@ -45,4 +45,8 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+    public function vehicle()
+    {
+        return $this->hasOne(\App\Models\Vehicle::class, 'user_id');
+    }
 }
