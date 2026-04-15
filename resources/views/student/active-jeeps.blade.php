@@ -2,15 +2,23 @@
 
 @section('content')
 
-<div class="fullScreen slideIn">
+<div class="fullScreen slideIn"
+id="app" 
+data-page="active-jeeps">
 
     <p class="pageLabelDark">UDD CAMPUS SHUTTLE SERVICE</p>
     <p class="headerTitle">Available E-Busses</p>
 
-    <div style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+    <div
+        id="vehicleList"
+        data-vehicle-ids='@json($jeeps->pluck("id"))'
+        style="width: 100%; display: flex; flex-direction: column; align-items: center;"
+    >
 
         @foreach($jeeps as $jeep)
-            <a href="/student/track/{{ $jeep->id }}" class="jeepCard">
+            <a href="/student/track/{{ $jeep->id }}" 
+                class="jeepCard"
+                data-vehicle-id="{{ $jeep->id }}">
 
                 <p class="jeepRoute">
                     Route: {{ $jeep->route_name }}
@@ -46,64 +54,4 @@
     </a>
 
 </div>
-
-<script>
-window.addEventListener("load", () => {
-
-    if (!window.Echo) {
-        console.error("Echo not loaded");
-        return;
-    }
-    
-    let vehicleIds = @json($jeeps->pluck('id'));
-    let reloading = false;
-    let polling = false;
-    
-    vehicleIds.forEach(id => {
-
-        Echo.private(`vehicle.${id}`)
-            .listen('.location.updated', () => {
-                if (reloading) return;
-                reloading = true;
-
-                console.log("Vehicle updated:", id);
-
-                location.reload();
-
-            });
-
-    });
-
-    async function checkActiveVehicles() {
-        if (polling) return;
-        polling = true;
-
-        try {
-            const res = await fetch('/api/vehicles/active');
-            const data = await res.json();
-
-            const newIds = data.map(v => v.id);
-
-            const changed =
-                newIds.length !== vehicleIds.length ||
-                newIds.some(id => !vehicleIds.includes(id));
-
-            if (changed) {
-                console.log("Active vehicles changed");
-                location.reload();
-                return;
-            }
-
-        } catch (e) {
-            console.error("Polling error", e);
-        } finally {
-            polling = false;
-        }
-    }
-
-    setInterval(checkActiveVehicles, 5000); 
-
-});
-</script>
-
 @endsection

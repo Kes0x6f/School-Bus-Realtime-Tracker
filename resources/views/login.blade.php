@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+<div id="app" data-page="auth">
 <div class="fixed inset-0 w-screen h-screen bg-cover bg-center -z-10"
         style="background-image: url('/images/jeep.png');">
 </div>
@@ -27,11 +28,11 @@
             <p class="logoText">Universidad De Dagupan</p>
             <p class="subLabel">E-Bus Tracker</p>
 
-            <button onclick="show('studentLogin')" class="primaryButton">
+            <button id="toStudent" class="primaryButton">
                 Log in as Student
             </button>
 
-            <button onclick="show('driverLogin')" class="secondaryButton">
+            <button id="toDriver" class="secondaryButton">
                 Log in as Driver
             </button>
         </div>
@@ -51,7 +52,7 @@
             <button type="submit" class="secondaryButton">Login</button>
         </form>   
 
-        <button onclick="show('landing')" class="backLink">
+        <button class="backBtn" data-target="landing">
             ← Return Home
         </button>
     </div>
@@ -69,7 +70,7 @@
 
                 <button type="submit" class="secondaryButton">Login</button>
             </form>
-        <button onclick="show('landing')" class="backLink">
+        <button class="backBtn" data-target="landing">
             ← Return Home
         </button>
     </div>
@@ -77,16 +78,6 @@
 
 </div>
 </div>
-
-
-<script>
-function show(id) {
-    document.getElementById('landing').style.display = 'none';
-    document.getElementById('studentLogin').style.display = 'none';
-    document.getElementById('driverLogin').style.display = 'none';
-
-    document.getElementById(id).style.display = 'block';
-}
-</script>
+</div>
 
 @endsection

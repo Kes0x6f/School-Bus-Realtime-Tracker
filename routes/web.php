@@ -63,10 +63,6 @@ Route::get('/driver/dashboard', function () {
 
 })->middleware('auth');
 
-Route::get('/student/active-jeeps', function () {
-    return view('student.active-jeeps');
-})->middleware('auth');
-
 
 Route::get('/student/track/{id}', function ($id) {
 
@@ -79,7 +75,8 @@ Route::get('/student/track/{id}', function ($id) {
 
 });
 
-Route::get('/student/active-jeeps', [StudentController::class, 'active']);
+Route::get('/student/active-jeeps', [StudentController::class, 'active'])
+    ->middleware('auth');
 
 
 use App\Events\VehicleLocationUpdated;

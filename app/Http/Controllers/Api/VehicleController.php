@@ -26,9 +26,18 @@ class VehicleController extends Controller
 //still unused
     public function activeVehicles()
     {
-        $vehicles = Vehicle::where('last_seen', '>=', now()->subSeconds(60))
-            ->select('id','plate_number','latitude','longitude','speed','last_seen')
-            ->get();
+        $vehicles = Vehicle::with('user')
+            ->where('last_seen', '>=', now()->subSeconds(60))
+            ->get([
+                'id',
+                'route_name',
+                'is_full',
+                'user_id',
+                'latitude',
+                'longitude',
+                'speed',
+                'last_seen'
+            ]);
 
         return response()->json($vehicles);
     }

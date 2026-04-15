@@ -21,9 +21,12 @@ class VehicleLocationUpdated implements ShouldBroadcastNow
 
     public function broadcastOn()
     {
-        return new PrivateChannel('vehicle.' . $this->vehicle->id);
+         return [
+            new PrivateChannel('vehicle.' . $this->vehicle->id),
+            new PrivateChannel('vehicles')
+        ];
     }
-
+    
     public function broadcastAs()
     {
         return 'location.updated';
@@ -36,7 +39,8 @@ class VehicleLocationUpdated implements ShouldBroadcastNow
             'latitude' => $this->vehicle->latitude,
             'longitude' => $this->vehicle->longitude,
             'speed' => $this->vehicle->speed,
-            'last_seen' => $this->vehicle->last_seen
+            'last_seen' => $this->vehicle->last_seen,
+            'route_name' => $this->vehicle->route_name,
         ];
     }
 }

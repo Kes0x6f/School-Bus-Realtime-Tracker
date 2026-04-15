@@ -180,7 +180,7 @@
     transform: translateY(0);
     box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   }
-  .backLink {
+  .backBtn {
     color: #007bff;
     cursor: pointer;
     margin: 10px 0;
@@ -341,3 +341,24 @@
       padding: 30px;
     }
   }
+
+.fade-enter {
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+.fade-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: all 0.3s ease;
+}
+
+.fade-exit {
+    opacity: 1;
+}
+
+.fade-exit-active {
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+}

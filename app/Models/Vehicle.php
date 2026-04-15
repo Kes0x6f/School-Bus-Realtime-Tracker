@@ -16,7 +16,13 @@ class Vehicle extends Model
         'latitude',
         'longitude',
         'speed',
-        'last_seen'
+        'last_seen',
+        'route_name',
+        'is_full'
+    ];
+
+    protected $casts = [
+        'last_seen' => 'datetime',
     ];
 
     public function locations()
