@@ -1,16 +1,25 @@
 <?php
 
 namespace App\Http\Controllers;
-use App\Models\Vehicle;
 
+use App\Models\Vehicle;
 use Illuminate\Http\Request;
 
 class StudentController extends Controller
 {
+     /**
+     * Active jeeps page.
+     * Only show vehicles where the driver has an active shift.
+     * is_active (GPS freshness) is intentionally NOT filtered here —
+     * a vehicle that's disconnected but still on shift should still
+     * appear in the list (with a disconnected indicator).
+     */
      public function active()
     {
-        $jeeps = Vehicle::where('last_seen', '>=', now()->subSeconds(60))->get();
-
+        $jeeps = Vehicle::with('user')
+            ->where('shift_active', true)
+            ->get();
+ 
         return view('student.active-jeeps', compact('jeeps'));
     }
     

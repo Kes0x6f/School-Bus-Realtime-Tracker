@@ -14,6 +14,8 @@ Route::get('/vehicles/active', [VehicleController::class, 'activeVehicles']);
 
 Route::get('/vehicles/{id}', [VehicleController::class, 'show']);
 
+Route::post('/vehicles/occupancy', [VehicleController::class, 'updateOccupancy']);
+
 Route::post('/test', function () {
     return response()->json(['success' => true]);
 });

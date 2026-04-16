@@ -13,6 +13,9 @@ class Vehicle extends Model
         'plate_number',
         'driver_name',
         'is_active',
+        'shift_active',
+        'shift_started_at',
+        'shift_ended_at',
         'latitude',
         'longitude',
         'speed',
@@ -22,8 +25,32 @@ class Vehicle extends Model
     ];
 
     protected $casts = [
-        'last_seen' => 'datetime',
+        'last_seen'       => 'datetime',
+        'shift_started_at'=> 'datetime',
+        'shift_ended_at'  => 'datetime',
+        'is_active'       => 'boolean',
+        'shift_active'    => 'boolean',
+        'is_full'         => 'boolean', 
     ];
+
+    protected $appends = ['gps_status'];
+
+     public function getGpsStatusAttribute(): string
+    {
+        if (!$this->shift_active) {
+            return 'shift_ended';
+        }
+ 
+        if (!$this->is_active) {
+            return 'disconnected';
+        }
+ 
+        if (($this->speed ?? 0) < 1) {
+            return 'idle';
+        }
+ 
+        return 'moving';
+    }
 
     public function locations()
     {

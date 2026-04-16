@@ -28,4 +28,8 @@ data-page="tracking">
 
 </div>
 
+<div id="noSignalBanner" class="trackingBanner hidden"></div>
+<div id="idleBanner" class="trackingBanner hidden"></div>
+<div id="shiftEndedOverlay" class="trackingOverlay hidden"></div>
+
 @endsection

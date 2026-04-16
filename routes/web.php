@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Broadcast;
 use App\Models\Vehicle;
+use App\Http\Controllers\Api\ShiftController;
 
 
 Broadcast::routes(['middleware' => ['web']]);
@@ -58,7 +59,8 @@ Route::get('/driver/dashboard', function () {
     }
 
     return view('driver.dashboard', [
-        'vehicleId' => $vehicle->id
+        'vehicleId' => $vehicle->id,
+        'vehicle' => $vehicle
     ]);
 
 })->middleware('auth');
@@ -96,4 +98,9 @@ Route::get('/debug-broadcast', function () {
     event(new VehicleLocationUpdated($vehicle));
 
     return "Broadcast sent for vehicle ID: " . $vehicle->id;
+});
+
+Route::middleware('auth')->group(function () {
+    Route::post('/driver/shift/start', [ShiftController::class, 'start']);
+    Route::post('/driver/shift/end',   [ShiftController::class, 'end']);
 });

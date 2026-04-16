@@ -36,9 +36,9 @@ data-page="active-jeeps">
                     </div>
 
                     <!-- CAPACITY -->
-                    <div class="statusBadge" style="background-color: #FFD54F;">
-                        <p style="color: #E65100; font-size: 11px; font-weight: bold;">
-                            {{ $jeep->is_full ? 'FULL' : 'SEATS AVAILABLE' }}
+                    <div class="statusBadge occupancyBadge" style="background-color: {{ $jeep->is_full ? '#E53935' : '#FFD54F' }};">
+                        <p style="color: {{ $jeep->is_full ? '#fff' : '#E65100' }}; font-size: 11px; font-weight: bold;">
+                        {{ $jeep->is_full ? 'FULL' : 'SEATS AVAILABLE' }}
                         </p>
                     </div>
 

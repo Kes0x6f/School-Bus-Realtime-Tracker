@@ -12,27 +12,27 @@ use Illuminate\Queue\SerializesModels;
 class VehicleLocationUpdated implements ShouldBroadcastNow
 {
     use InteractsWithSockets, SerializesModels;
-    public $vehicle;
+    public Vehicle $vehicle;
 
     public function __construct(Vehicle $vehicle)
     {
         $this->vehicle = $vehicle;
     }
 
-    public function broadcastOn()
+    public function broadcastOn(): array
     {
          return [
             new PrivateChannel('vehicle.' . $this->vehicle->id),
-            new PrivateChannel('vehicles')
+            new PrivateChannel('vehicles'),
         ];
     }
     
-    public function broadcastAs()
+    public function broadcastAs(): string
     {
         return 'location.updated';
     }
 
-    public function broadcastWith()
+    public function broadcastWith(): array 
     {
         return [
             'id' => $this->vehicle->id,
@@ -41,6 +41,10 @@ class VehicleLocationUpdated implements ShouldBroadcastNow
             'speed' => $this->vehicle->speed,
             'last_seen' => $this->vehicle->last_seen,
             'route_name' => $this->vehicle->route_name,
+            'shift_active' => $this->vehicle->shift_active,
+            'is_active'    => $this->vehicle->is_active,
+            'gps_status'   => $this->vehicle->gps_status, // moving|idle|disconnected|shift_ended
+            'is_full' => $this->vehicle->is_full,
         ];
     }
 }
