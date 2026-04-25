@@ -569,3 +569,293 @@
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* ============================================================
+   TRACKING PAGE — add these rules to app.css
+   (or paste into a <style> block in track.blade.php)
+   ============================================================ */
+
+/* ─── Map status pill ───────────────────────────────────────── */
+.map-status-pill {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    pointer-events: none; /* don't block map interactions */
+    transition: background 0.3s;
+}
+
+.pill-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+    background: #999;
+    transition: background 0.4s;
+}
+
+/* ─── Banners ────────────────────────────────────────────────── */
+.tracking-banner {
+     position: absolute;       /* relative to #mapContainer, not the page */
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;            /* above the map tiles but below the pill  */
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: bold;
+    text-align: center;
+    border-radius: 0 0 10px 10px;   /* match the map's border-radius */
+    pointer-events: none;           /* don't block map interactions   */
+ 
+    /* Slide in/out */
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.tracking-banner.hidden {
+    display: none;
+}
+
+.tracking-banner-danger {
+    background: rgba(191, 54, 12, 0.92);
+    color: #fff;
+}
+
+.tracking-banner-warning {
+    background: rgba(249, 168, 37, 0.92);
+    color: #4e2e00;
+}
+
+/* ─── Tracking overlay (shift ended) ────────────────────────── */
+.tracking-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.78);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    backdrop-filter: blur(3px);
+}
+
+.tracking-overlay.hidden {
+    display: none;
+}
+
+.shift-ended-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 32px 24px;
+    max-width: 340px;
+    width: 100%;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+
+.shift-ended-icon {
+    font-size: 52px;
+}
+
+.shift-ended-title {
+    font-size: 22px;
+    font-weight: bold;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.shift-ended-body {
+    font-size: 14px;
+    color: #666;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.shift-ended-btn-primary {
+    display: block;
+    background: #002D62;
+    color: #fff;
+    padding: 14px;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 15px;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.shift-ended-btn-primary:hover {
+    background: #004a96;
+}
+
+.shift-ended-btn-secondary {
+    background: none;
+    border: 1px solid #ddd;
+    color: #888;
+    padding: 10px;
+    border-radius: 10px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.shift-ended-btn-secondary:hover {
+    background: #f5f5f5;
+}
+
+/* ─── Toast stack ────────────────────────────────────────────── */
+.toast-stack {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+    max-width: calc(100vw - 32px);
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    min-width: 240px;
+    max-width: 340px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    pointer-events: all;
+
+    /* Start hidden — JS adds .toast-visible to animate in */
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.toast.toast-visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast.toast-exit {
+    opacity: 0;
+    transform: translateX(20px);
+}
+
+.toast-success  { background: #2e7d32; }
+.toast-info     { background: #1565c0; }
+.toast-warning  { background: #e65100; }
+.toast-danger   { background: #b71c1c; }
+
+.toast-msg {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.8);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 2px;
+    flex-shrink: 0;
+}
+
+.toast-close:hover {
+    color: #fff;
+}
+
+/* ─── Vehicle info panel ─────────────────────────────────────── */
+.tracking-info-panel {
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    margin-top: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.info-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.info-row-space {
+    justify-content: space-between;
+}
+
+.info-col {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.info-label {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    color: #999;
+    margin: 0;
+}
+
+.info-value {
+    font-size: 14px;
+    font-weight: bold;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.info-value-lg {
+    font-size: 16px;
+}
+
+/* ─── Capacity badge ─────────────────────────────────────────── */
+.capacity-badge {
+    font-size: 10px;
+    font-weight: bold;
+    padding: 5px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    transition: background 0.3s, color 0.3s;
+}
+
+.cap-full {
+    background: #E53935;
+    color: #fff;
+}
+
+.cap-available {
+    background: #FFD54F;
+    color: #E65100;
+}

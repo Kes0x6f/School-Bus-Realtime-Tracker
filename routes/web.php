@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Broadcast;
 use App\Models\Vehicle;
 use App\Http\Controllers\Api\ShiftController;
+use App\Events\VehicleStatusChanged;
 
 
 Broadcast::routes(['middleware' => ['web']]);
@@ -38,11 +39,41 @@ Route::post('/login', function (Request $request){
 });
 
 Route::post('/logout', function (Request $request) {
+    $user = Auth::user();
+ 
+    // If this is a driver, end their shift before logging out so the
+    // vehicle is immediately removed from the active-jeeps list and
+    // any open tracking pages show the shift-ended overlay.
+    if ($user && $user->role === 'driver') {
+        $vehicle = Vehicle::where('user_id', $user->id)
+                          ->where('shift_active', true)
+                          ->first();
+ 
+        if ($vehicle) {
+            $vehicle->update([
+                'shift_active'   => false,
+                'shift_ended_at' => now(),
+                'is_active'      => false,
+            ]);
+ 
+            $vehicle->refresh();
+ 
+            // Broadcast BEFORE the session is invalidated so the
+            // broadcasting auth middleware can still resolve the channel.
+            broadcast(new VehicleStatusChanged($vehicle));
+ 
+            \Log::info('[Logout] Shift auto-ended on logout', [
+                'vehicle_id' => $vehicle->id,
+                'user_id'    => $user->id,
+            ]);
+        }
+    }
+ 
     Auth::logout();
-
+ 
     $request->session()->invalidate();
     $request->session()->regenerateToken();
-
+ 
     return redirect('/');
 });
 

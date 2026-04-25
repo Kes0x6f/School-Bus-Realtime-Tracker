@@ -6,11 +6,11 @@ namespace App\Events;
 use App\Models\Vehicle;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class VehicleStatusChanged implements ShouldBroadcast
+class VehicleStatusChanged implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -50,6 +50,11 @@ class VehicleStatusChanged implements ShouldBroadcast
                 'shift_ended_at'   => $this->vehicle->shift_ended_at?->toISOString(),
                 'route_name'       => $this->vehicle->route_name,
                 'is_full'          => $this->vehicle->is_full,
+                // Included so active-jeeps.js addVehicle() can render the
+                // operator name on cards added while the page is already open.
+                'user'             => $this->vehicle->user
+                                        ? ['name' => $this->vehicle->user->name]
+                                        : null,
             ]
         ];
     }

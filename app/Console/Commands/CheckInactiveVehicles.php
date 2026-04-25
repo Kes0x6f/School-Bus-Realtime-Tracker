@@ -24,8 +24,8 @@ class CheckInactiveVehicles extends Command
      *                                  Vehicle is removed from the active list.
      */
 
-    const GPS_STALE_SECONDS     = 180;   // 3 minutes
-    const SHIFT_AUTO_END_SECONDS = 1200;  // 20 minutes
+    const GPS_STALE_SECONDS     = 30;   // 3 minutes
+    const SHIFT_AUTO_END_SECONDS = 60;  // 20 minutes
 
     public function handle()
     {
@@ -34,13 +34,13 @@ class CheckInactiveVehicles extends Command
         // Only check vehicles that are currently on a shift.
         // No point evaluating vehicles that are already shift_ended.
         $vehicles = Vehicle::where('shift_active', true)->get();
- 
         foreach ($vehicles as $vehicle) {
             if (!$vehicle->last_seen) {
                 continue;
             }
- 
-            $secondsSinceUpdate = now()->diffInSeconds($vehicle->last_seen);
+
+            $secondsSinceUpdate = $vehicle->last_seen->diffInSeconds(now());
+            $secondsSinceShiftStarted = $vehicle->shift_started_at->diffInSeconds(now());
  
             \Log::info('[CheckInactiveVehicles] Vehicle check', [
                 'id'              => $vehicle->id,
@@ -53,12 +53,14 @@ class CheckInactiveVehicles extends Command
             // Threshold 2: Auto-end shift (20 min no GPS)
             // Check this first so we don't also fire the GPS-stale event
             // for a vehicle that's being fully ended.
-            if ($secondsSinceUpdate >= self::SHIFT_AUTO_END_SECONDS) {
+            // Check if the shift has just started and make sure that it's not checking against last update from last shift
+            if ($secondsSinceUpdate >= self::SHIFT_AUTO_END_SECONDS && $secondsSinceShiftStarted >= self::SHIFT_AUTO_END_SECONDS) {
  
                 \Log::info('[CheckInactiveVehicles] Auto-ending shift', [
                     'vehicle_id'     => $vehicle->id,
                     'seconds_since'  => $secondsSinceUpdate,
                 ]);
+
  
                 $vehicle->update([
                     'shift_active'   => false,

@@ -1,56 +1,60 @@
 /**
- * Tracking Page
+ * Tracking Page — tracking.js
  *
- * Displays a single vehicle's real-time location on a Leaflet map.
+ * What this module does
+ * ─────────────────────
+ * 1. Renders a Leaflet map and places a marker at the vehicle's last known position.
+ * 2. Receives real-time location updates via Echo whisper (primary) and
+ *    the `.location.updated` broadcast event (fallback when whisper is silent > 2 s).
+ * 3. Keeps an info panel up-to-date: route, driver, speed, last-seen (live ticker),
+ *    shift start time, and passenger capacity.
+ * 4. Fires toast notifications *only when the GPS status actually changes* — so the
+ *    user isn't spammed on every location ping.
+ * 5. Shows/hides banners (no-signal, idle) and a full-screen shift-ended modal.
+ * 6. Runs a staleness checker every 30 s that switches the UI to "disconnected"
+ *    if no update has arrived for 3+ minutes — giving students immediate feedback
+ *    before the server-side cron even fires.
  *
- * State awareness:
- *   - On load: checks vehicle's current gps_status from API and renders correct initial UI.
- *   - Whisper (primary): updates marker + resets staleness timer.
- *   - Broadcast fallback: used when whisper is silent for > 2s.
- *   - Staleness checker: runs every 30s.
- *       → 3+ min no update  → shows "No Signal" banner.
- *       → GPS resumes       → banner dismissed.
- *   - vehicle.status.changed event: responds to shift-ended and disconnected transitions.
- *
- * UI overlays / banners:
- *   #noSignalBanner    — shown when GPS hasn't updated for 3+ min (disconnected)
- *   #idleBanner        — shown when vehicle is moving but speed = 0 (idle)
- *   #shiftEndedOverlay — full-page overlay shown when shift ends
- *
- * Required HTML in the Blade view:
- *   <div id="mapContainer" data-vehicle-id="{{ $jeepId }}" data-driver-id="{{ $vehicle->user_id }}">
- *   <div id="map"></div>
- *   <div id="noSignalBanner" class="trackingBanner hidden">...</div>
- *   <div id="idleBanner" class="trackingBanner hidden">...</div>
- *   <div id="shiftEndedOverlay" class="trackingOverlay hidden">...</div>
+ * Status flow
+ * ───────────
+ *   moving      → clear all banners          | toast: "● GPS Reconnected" (if was disconnected)
+ *   idle        → show idle banner            | toast: "Vehicle has stopped"
+ *   disconnected→ show no-signal banner       | toast: "GPS signal lost"
+ *   shift_ended → show full-screen overlay    | (no toast — overlay is prominent enough)
  */
-
 const GPS_STALE_MS     = 3 * 60 * 1000; // 3 minutes — mirrors backend threshold
 const STALE_CHECK_MS   = 30 * 1000;     // check every 30s
 
-let lastTimestamp    = 0;
-let lastWhisperTime  = 0; // wall-clock time we last received any update (whisper or broadcast)
+//States
 let map;
-let jeepMarker = null;
-let channel    = null;
+let jeepMarker        = null;
+let channel           = null;
 let staleCheckInterval = null;
+let lastSeenTickerInterval = null;
+ 
+let lastTimestamp    = 0;       // most recent whisper timestamp (ms)
+let lastWhisperTime  = 0;       // wall-clock time of last received update
+let lastSeenISO      = null;    // ISO string for the last-seen ticker
+let previousGpsStatus = null;   // track previous status to fire toasts only on change
 
 export function initTracking() {
-    const container = document.getElementById("mapContainer");
-    if (!container) return;
-
-    if (typeof L === "undefined") {
-        console.error("Leaflet (L) is not loaded");
+    const container = document.getElementById("app");
+    if (!app || typeof L === 'undefined') {
+        console.error('Tracking: missing #app or Leaflet');
         return;
     }
 
     const vehicleId      = container.dataset.vehicleId;
     const expectedDriverId = parseInt(container.dataset.driverId);
 
+    seedInfoPanel(app);
+ 
     initMap();
-    loadInitialVehicle(vehicleId);
+    loadInitialVehicle(vehicleId, app);
     initRealtime(vehicleId, expectedDriverId);
     startStalenessChecker();
+    startLastSeenTicker();
+    bindShiftEndedDismiss();
 }
 
 // ─── Map init ────────────────────────────────────────────────────────────────
@@ -66,9 +70,33 @@ function initMap() {
     setTimeout(() => map.invalidateSize(), 500);
 }
 
-// ─── Initial load ────────────────────────────────────────────────────────────
-
-function loadInitialVehicle(vehicleId) {
+// ─── Initial load ─────────────────────────────────────────────────────────────
+ 
+/**
+ * Seed the info panel from the data-* attributes the Blade template already
+ * rendered. This avoids a visible "flash" of empty/dashed fields before the
+ * first API response comes back.
+ */
+function seedInfoPanel(app) {
+    setInfoField('infoRoute',     app.dataset.route     || 'N/A');
+    setInfoField('infoDriver',    app.dataset.driverName || 'Unknown');
+    setInfoField('infoSpeed',     formatSpeed(parseFloat(app.dataset.speed || 0)));
+ 
+    const shiftStarted = app.dataset.shiftStarted;
+    setInfoField('infoShiftStart', shiftStarted ? formatTime(shiftStarted) : '--');
+ 
+    lastSeenISO = app.dataset.lastSeen || null;
+    if (lastSeenISO) {
+        lastWhisperTime = new Date(lastSeenISO).getTime();
+    }
+ 
+    updateCapacityBadge(app.dataset.isFull === '1');
+ 
+    // Apply initial GPS status (without showing a toast — page just loaded)
+    const initialStatus = app.dataset.gpsStatus || 'disconnected';
+    applyGpsStatus(initialStatus, lastSeenISO, /* silent = */ true);
+}
+function loadInitialVehicle(vehicleId, app) {
     fetch(`/api/vehicles/${vehicleId}`)
         .then(res => res.json())
         .then(vehicle => {
@@ -81,10 +109,16 @@ function loadInitialVehicle(vehicleId) {
             }
 
             if (vehicle.latitude && vehicle.longitude) {
-                jeepMarker = L.marker([vehicle.latitude, vehicle.longitude]).addTo(map);
-                map.setView([vehicle.latitude, vehicle.longitude], 16);
+                placeMarker(vehicle.latitude, vehicle.longitude);
             }
-
+             // Refresh panel with fresher API data (in case Blade data was stale)
+            setInfoField('infoRoute',  vehicle.route_name || 'N/A');
+            setInfoField('infoSpeed',  formatSpeed(vehicle.speed));
+ 
+            lastSeenISO = vehicle.last_seen || null;
+            if (lastSeenISO) {
+                lastWhisperTime = new Date(lastSeenISO).getTime();
+            }
             // Reflect whatever state the vehicle is already in
             applyGpsStatus(vehicle.gps_status, vehicle.last_seen);
         })
@@ -100,10 +134,17 @@ function initRealtime(vehicleId, expectedDriverId) {
     channel.listen('.location.updated', (event) => {
         const now = Date.now();
 
-        // Only use broadcast if whisper has been silent for > 2s
+        // Only use broadcast if whisper has been silent for > 2 s
         if (now - lastTimestamp > 2000) {
-            console.log("Using broadcast fallback");
-            onLocationReceived(event.latitude, event.longitude, event.speed, event.gps_status, event.last_seen);
+            onLocationReceived({
+                lat:       event.latitude,
+                lng:       event.longitude,
+                speed:     event.speed,
+                gpsStatus: event.gps_status,
+                lastSeen:  event.last_seen,
+                isFull:    event.is_full,
+                route:     event.route_name,
+            });
         }
     });
 
@@ -115,12 +156,21 @@ function initRealtime(vehicleId, expectedDriverId) {
         if (data.timestamp <= lastTimestamp) return;
 
         lastTimestamp = data.timestamp;
+
         const latency = Date.now() - data.timestamp;
         console.log("Whisper latency:", latency, "ms");
 
         // speed from whisper; gps_status derived locally for immediate response
         const derivedStatus = (data.speed ?? 0) < 1 ? 'idle' : 'moving';
-        onLocationReceived(data.latitude, data.longitude, data.speed, derivedStatus, null);
+        onLocationReceived({
+            lat:       data.latitude,
+            lng:       data.longitude,
+            speed:     data.speed,
+            gpsStatus: derivedStatus,
+            lastSeen:  null, // whisper doesn't carry a DB-persisted last_seen
+            isFull:    undefined,
+            route:     undefined,
+        });
     });
 
     // ── Status change (shift ended, disconnected, reconnected) ─────────────
@@ -133,159 +183,291 @@ function initRealtime(vehicleId, expectedDriverId) {
             return;
         }
 
+        // Update panel fields that status-change events carry
+        if (vehicle.is_full !== undefined) updateCapacityBadge(vehicle.is_full);
+        if (vehicle.route_name)           setInfoField('infoRoute', vehicle.route_name);
+ 
+        lastSeenISO = vehicle.last_seen || lastSeenISO;
+
         applyGpsStatus(vehicle.gps_status, vehicle.last_seen);
     });
 }
 
 // ─── Location received ───────────────────────────────────────────────────────
 
-function onLocationReceived(lat, lng, speed, gpsStatus, lastSeen) {
-    lastWhisperTime = Date.now();
-
+function onLocationReceived({ lat, lng, speed, gpsStatus, lastSeen, isFull, route }) {
+   lastWhisperTime = Date.now();
+ 
+    if (lastSeen) lastSeenISO = lastSeen;
+    else          lastSeenISO = new Date(lastWhisperTime).toISOString();
+ 
     updateMarker(lat, lng);
-    applyGpsStatus(gpsStatus, lastSeen);
+    setInfoField('infoSpeed', formatSpeed(speed));
+    if (route !== undefined)   setInfoField('infoRoute', route || 'N/A');
+    if (isFull !== undefined)  updateCapacityBadge(isFull);
+ 
+    applyGpsStatus(gpsStatus, lastSeenISO);
 }
 
-// ─── Staleness checker ───────────────────────────────────────────────────────
-
-/**
- * Runs every 30 seconds.
- * If we haven't received any update for GPS_STALE_MS (3 min),
- * switch UI to "disconnected" state proactively — even before the
- * server's CheckInactiveVehicles command fires.
- *
- * This gives students immediate feedback in the browser
- * rather than waiting for the next server-side cron tick.
- */
-function startStalenessChecker() {
-    staleCheckInterval = setInterval(() => {
-        if (lastWhisperTime === 0) return; // haven't received any update yet
-
-        const msSinceUpdate = Date.now() - lastWhisperTime;
-
-        if (msSinceUpdate >= GPS_STALE_MS) {
-            const isoLastSeen = new Date(lastWhisperTime).toISOString();
-            applyGpsStatus('disconnected', isoLastSeen);
-        }
-    }, STALE_CHECK_MS);
-}
-
-// ─── UI state ────────────────────────────────────────────────────────────────
-
+// ─── GPS status → UI ──────────────────────────────────────────────────────────
+ 
 /**
  * Apply the correct UI for a given gps_status.
+ * Toasts fire only when the status *changes* (not on every update ping).
+ * Pass silent = true to skip the toast (used on initial page load).
  *
- * moving       → dismiss all banners
- * idle         → show idle banner, dismiss no-signal
- * disconnected → show no-signal banner with last-seen time, dismiss idle
- * shift_ended  → show full overlay (handled separately via showShiftEndedOverlay)
+ * moving      → clear all banners
+ * idle        → idle banner
+ * disconnected→ no-signal banner
+ * shift_ended → full-screen overlay (handled via showShiftEndedOverlay)
  */
-function applyGpsStatus(gpsStatus, lastSeen) {
+function applyGpsStatus(gpsStatus, lastSeen, silent = false) {
+    const changed = gpsStatus !== previousGpsStatus;
+ 
     switch (gpsStatus) {
         case 'moving':
             hideBanner('noSignalBanner');
             hideBanner('idleBanner');
+            setStatusPill('moving');
+            if (changed && !silent && previousGpsStatus === 'disconnected') {
+                showToast('● GPS signal restored — vehicle is moving', 'success');
+            }
             break;
-
+ 
         case 'idle':
             hideBanner('noSignalBanner');
-            showBanner('idleBanner', 'Vehicle is currently stopped or idling.');
+            showBanner('idleBanner', '🚌 Vehicle is currently stopped or idling');
+            setStatusPill('idle');
+            if (changed && !silent) {
+                showToast('Vehicle has stopped — waiting for passengers', 'info');
+            }
             break;
-
+ 
         case 'disconnected': {
             hideBanner('idleBanner');
             const ago = lastSeen ? formatTimeAgo(lastSeen) : 'unknown time';
-            showBanner('noSignalBanner', `No GPS signal · Last update: ${ago}`);
+            showBanner('noSignalBanner', `⚠ No GPS signal · Last update: ${ago}`, 'noSignalBannerText');
+            setStatusPill('disconnected');
+            if (changed && !silent) {
+                showToast('GPS signal lost. Last seen: ' + ago, 'danger', 6000);
+            }
             break;
         }
-
+ 
         case 'shift_ended':
             showShiftEndedOverlay();
-            break;
+            return; // don't update previousGpsStatus here — overlay handles it
     }
+ 
+    previousGpsStatus = gpsStatus;
 }
-
+ 
+// ─── Status pill (floating on map) ────────────────────────────────────────────
+ 
+const PILL_CONFIG = {
+    moving:      { dot: '#43A047', text: '● LIVE',      bg: 'rgba(0,0,0,0.65)' },
+    idle:        { dot: '#FBC02D', text: '● IDLE',      bg: 'rgba(0,0,0,0.65)' },
+    disconnected:{ dot: '#E64A19', text: '◌ NO SIGNAL', bg: 'rgba(0,0,0,0.65)' },
+    shift_ended: { dot: '#9E9E9E', text: '■ ENDED',     bg: 'rgba(0,0,0,0.65)' },
+};
+ 
+function setStatusPill(gpsStatus) {
+    const pill    = document.getElementById('statusPill');
+    const dot     = document.getElementById('statusPillDot');
+    const textEl  = document.getElementById('statusPillText');
+    if (!pill || !dot || !textEl) return;
+ 
+    const cfg = PILL_CONFIG[gpsStatus] || PILL_CONFIG.disconnected;
+    dot.style.background    = cfg.dot;
+    textEl.textContent      = cfg.text;
+    pill.style.background   = cfg.bg;
+}
+ 
+// ─── Banners ──────────────────────────────────────────────────────────────────
+ 
 function showBanner(id, message) {
     const el = document.getElementById(id);
     if (!el) return;
     el.textContent = message;
     el.classList.remove('hidden');
 }
-
+ 
 function hideBanner(id) {
     const el = document.getElementById(id);
     if (!el) return;
     el.classList.add('hidden');
 }
-
+ 
+// ─── Toast notifications ──────────────────────────────────────────────────────
+ 
 /**
- * Full-page overlay shown when the driver ends their shift (or auto-end fires).
- * Stops the staleness checker since there's nothing left to track.
- * Provides a link back to the active jeeps list.
+ * showToast(message, type, duration)
+ *
+ * type:     'success' | 'info' | 'danger' | 'warning'
+ * duration: ms before auto-dismiss (default 4500)
  */
+function showToast(message, type = 'info', duration = 4500) {
+    const stack = document.getElementById('toastStack');
+    if (!stack) return;
+ 
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <span class="toast-msg">${message}</span>
+        <button class="toast-close" aria-label="Dismiss">✕</button>
+    `;
+ 
+    toast.querySelector('.toast-close').addEventListener('click', () => dismissToast(toast));
+    stack.appendChild(toast);
+ 
+    // Animate in
+    requestAnimationFrame(() => toast.classList.add('toast-visible'));
+ 
+    // Auto-dismiss
+    setTimeout(() => dismissToast(toast), duration);
+}
+ 
+function dismissToast(toast) {
+    toast.classList.remove('toast-visible');
+    toast.classList.add('toast-exit');
+    setTimeout(() => toast.remove(), 350);
+}
+ 
+// ─── Shift-ended overlay ──────────────────────────────────────────────────────
+ 
 function showShiftEndedOverlay() {
     clearInterval(staleCheckInterval);
+    clearInterval(lastSeenTickerInterval);
+ 
     hideBanner('noSignalBanner');
     hideBanner('idleBanner');
-
+    setStatusPill('shift_ended');
+ 
     const overlay = document.getElementById('shiftEndedOverlay');
     if (overlay) {
         overlay.classList.remove('hidden');
+    }
+}
+ 
+/** "Stay on this page" button — dismisses the modal so students can see the last map position */
+function bindShiftEndedDismiss() {
+    const btn = document.getElementById('shiftEndedDismiss');
+    btn?.addEventListener('click', () => {
+        const overlay = document.getElementById('shiftEndedOverlay');
+        overlay?.classList.add('hidden');
+        showToast('Shift has ended — map shows last known position', 'warning', 8000);
+    });
+}
+ 
+// ─── Info panel helpers ───────────────────────────────────────────────────────
+ 
+function setInfoField(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+}
+ 
+function updateCapacityBadge(isFull) {
+    const badge = document.getElementById('infoCapacityBadge');
+    if (!badge) return;
+    badge.textContent = isFull ? 'FULL' : 'SEATS AVAILABLE';
+    badge.className   = `capacity-badge ${isFull ? 'cap-full' : 'cap-available'}`;
+}
+ 
+// ─── Staleness checker ────────────────────────────────────────────────────────
+ 
+/**
+ * Runs every 30 s. If no update has arrived for GPS_STALE_MS (3 min),
+ * proactively switch to "disconnected" — giving students immediate feedback
+ * before the server-side cron even fires.
+ */
+function startStalenessChecker() {
+    staleCheckInterval = setInterval(() => {
+        if (lastWhisperTime === 0) return;
+ 
+        const ms = Date.now() - lastWhisperTime;
+        if (ms >= GPS_STALE_MS) {
+            const iso = new Date(lastWhisperTime).toISOString();
+            applyGpsStatus('disconnected', iso);
+        }
+    }, STALE_CHECK_MS);
+}
+ 
+// ─── Live last-seen ticker ────────────────────────────────────────────────────
+ 
+/**
+ * Ticks every second to keep #infoLastSeen fresh (e.g. "12s ago", "3m ago")
+ * without requiring a server round-trip.
+ */
+function startLastSeenTicker() {
+    lastSeenTickerInterval = setInterval(() => {
+        const el = document.getElementById('infoLastSeen');
+        if (!el) return;
+ 
+        if (!lastSeenISO) {
+            el.textContent = '--';
+            return;
+        }
+ 
+        el.textContent = formatTimeAgo(lastSeenISO);
+    }, 1000);
+}
+ 
+// ─── Marker ───────────────────────────────────────────────────────────────────
+ 
+function placeMarker(lat, lng) {
+    if (jeepMarker) {
+        jeepMarker.setLatLng([lat, lng]);
+    } else {
+        jeepMarker = L.marker([lat, lng]).addTo(map);
+    }
+    map.setView([lat, lng], 16);
+}
+ 
+/**
+ * Smoothly animate the marker to (lat, lng) over ~250 ms (5 steps × 50 ms).
+ * Falls back to placeMarker if jeepMarker hasn't been created yet.
+ */
+function updateMarker(lat, lng) {
+    if (!jeepMarker) {
+        placeMarker(lat, lng);
         return;
     }
-
-    // Fallback: create overlay dynamically if Blade doesn't have one
-    const div = document.createElement('div');
-    div.id = 'shiftEndedOverlay';
-    div.style.cssText = `
-        position: fixed; inset: 0; background: rgba(0,0,0,0.75);
-        display: flex; flex-direction: column;
-        align-items: center; justify-content: center;
-        color: #fff; text-align: center; z-index: 9999;
-        gap: 16px; padding: 24px;
-    `;
-    div.innerHTML = `
-        <p style="font-size: 22px; font-weight: bold;">🚌 Shift Ended</p>
-        <p style="font-size: 15px; opacity: 0.85;">
-            This jeepney has ended its shift and is no longer active.
-        </p>
-        <a href="/student/active-jeeps"
-           style="background:#43A047; color:#fff; padding: 12px 24px;
-                  border-radius: 8px; text-decoration: none; font-weight: bold;">
-            View Active Jeepneys
-        </a>
-    `;
-
-    document.body.appendChild(div);
-}
-
-// ─── Marker animation ────────────────────────────────────────────────────────
-
-function updateMarker(lat, lng) {
-    if (!jeepMarker) return;
-
+ 
     const current = jeepMarker.getLatLng();
     const target  = L.latLng(lat, lng);
     const steps   = 5;
     let i = 0;
-
+ 
     const interval = setInterval(() => {
         i++;
-        const newLat = current.lat + (target.lat - current.lat) * (i / steps);
-        const newLng = current.lng + (target.lng - current.lng) * (i / steps);
+        const t      = i / steps;
+        const newLat = current.lat + (target.lat - current.lat) * t;
+        const newLng = current.lng + (target.lng - current.lng) * t;
         jeepMarker.setLatLng([newLat, newLng]);
-
         if (i >= steps) clearInterval(interval);
     }, 50);
-
-    map.panTo([lat, lng]);
+ 
+    map.panTo([lat, lng], { animate: true, duration: 0.25 });
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
+ 
+// ─── Formatters ───────────────────────────────────────────────────────────────
+ 
 function formatTimeAgo(isoString) {
     const diffSec = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+    if (diffSec < 5)    return 'Just now';
     if (diffSec < 60)   return `${diffSec}s ago`;
     if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
     return `${Math.floor(diffSec / 3600)}h ago`;
 }
+ 
+function formatSpeed(speed) {
+    const s = parseFloat(speed);
+    if (isNaN(s)) return '-- km/h';
+    return `${Math.round(s)} km/h`;
+}
+ 
+function formatTime(isoString) {
+    if (!isoString) return '--';
+    return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+ 
