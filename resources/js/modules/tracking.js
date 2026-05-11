@@ -47,10 +47,10 @@ export function initTracking() {
     const vehicleId      = container.dataset.vehicleId;
     const expectedDriverId = parseInt(container.dataset.driverId);
 
-    seedInfoPanel(app);
+    seedInfoPanel(container);
  
     initMap();
-    loadInitialVehicle(vehicleId, app);
+    loadInitialVehicle(vehicleId, container);
     initRealtime(vehicleId, expectedDriverId);
     startStalenessChecker();
     startLastSeenTicker();
@@ -484,4 +484,3 @@ function formatTime(isoString) {
     if (!isoString) return '--';
     return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
- 

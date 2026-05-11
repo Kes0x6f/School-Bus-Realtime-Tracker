@@ -1,10 +1,11 @@
 import './bootstrap';
 
-import { initTracking }        from "./modules/tracking";
-import { initActiveJeeps }     from "./modules/active-jeeps";
-import { initAuthPage }        from "./modules/login";
-import { initDriverDashboard } from "./modules/driver-dashboard";
-import { initAdminDashboard }  from "./modules/admin-dashboard";
+import { initTracking }         from "./modules/tracking";
+import { initActiveJeeps }      from "./modules/active-jeeps";
+import { initAuthPage }         from "./modules/login";
+import { initDriverDashboard }  from "./modules/driver-dashboard";
+import { initAdminDashboard }   from "./modules/admin-dashboard";
+import { initAnnouncements }    from "./modules/announcements";
 
 document.addEventListener("DOMContentLoaded", () => {
     const app  = document.getElementById("app");
@@ -16,10 +17,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     switch (page) {
-        case "tracking":         initTracking();        break;
-        case "active-jeeps":     initActiveJeeps();     break;
-        case "auth":             initAuthPage();        break;
-        case "driver-dashboard": initDriverDashboard(); break;
-        case "admin-dashboard":  initAdminDashboard();  break;
+        case "tracking":
+            initTracking();
+            // Only show announcements relevant to this vehicle's route
+            initAnnouncements(app.dataset.route || null);
+            break;
+
+        case "active-jeeps":
+            initActiveJeeps();
+            // Show all active announcements — no route filter
+            initAnnouncements(null);
+            break;
+
+        case "auth":
+            initAuthPage();
+            break;
+
+        case "driver-dashboard":
+            initDriverDashboard();
+            break;
+
+        case "admin-dashboard":
+            initAdminDashboard();
+            break;
     }
 });

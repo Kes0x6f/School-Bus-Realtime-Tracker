@@ -20,7 +20,8 @@
     data-driver-name="{{ $vehicle->user->name ?? 'Unknown' }}"
     data-shift-started="{{ $vehicle->shift_started_at?->toISOString() }}"
     data-is-full="{{ $vehicle->is_full ? '1' : '0' }}"
-    data-plate="{{ $vehicle->plate_number ?? '' }}">
+    data-plate="{{ $vehicle->plate_number ?? '' }}"
+    data-announcements='@json($announcements)'>
 
     <p class="pageLabelDark">TRACKING LOCATION</p>
 

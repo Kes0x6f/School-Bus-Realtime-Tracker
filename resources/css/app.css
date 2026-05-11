@@ -1539,3 +1539,100 @@
 .modal-input:focus {
     border-color: #002D62;
 }
+
+/* ============================================================
+   ANNOUNCEMENT BANNERS (student pages)
+   ============================================================ */
+
+.announcement-stack {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.announcement-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: #FFF7ED;
+    border: 1.5px solid #FDBA74;
+    border-left: 4px solid #C2410C;
+    border-radius: 12px;
+    padding: 12px 14px;
+    box-shadow: 0 2px 8px rgba(194, 65, 12, 0.12);
+
+    /* Entrance animation */
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.announcement-banner.announcement-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.announcement-banner.announcement-exit {
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.announcement-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    line-height: 1.3;
+}
+
+.announcement-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.announcement-scope {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #C2410C;
+    margin-bottom: 3px;
+}
+
+.announcement-message {
+    font-size: 13px;
+    font-weight: 500;
+    color: #431407;
+    margin: 0;
+    line-height: 1.45;
+}
+
+.announcement-dismiss {
+    background: none;
+    border: none;
+    font-size: 14px;
+    color: #FDBA74;
+    cursor: pointer;
+    padding: 0 2px;
+    flex-shrink: 0;
+    line-height: 1;
+    transition: color 0.15s;
+}
+
+.announcement-dismiss:hover {
+    color: #C2410C;
+}
+
+/* ─── Admin announcement row (in modal list) ──────────────────── */
+.admin-announcement-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    background: #FFF7ED;
+    border: 1px solid #FDBA74;
+    border-radius: 10px;
+}

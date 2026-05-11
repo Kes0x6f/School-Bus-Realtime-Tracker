@@ -75,6 +75,7 @@ function addVehicle(container, vehicle) {
     a.href = `/student/track/${vehicle.id}`;
     a.className = "jeepCard fade-enter";
     a.dataset.vehicleId = vehicle.id;
+    a.dataset.route     = vehicle.route_name ?? '';
 
     const operator = vehicle.user?.name ?? 'Unknown';
     const route    = vehicle.route_name ?? 'N/A';

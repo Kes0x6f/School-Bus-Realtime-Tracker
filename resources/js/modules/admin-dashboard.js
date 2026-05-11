@@ -64,6 +64,24 @@ function initLiveMap() {
         attribution: '&copy; OpenStreetMap',
     }).addTo(adminMap);
 
+    // Inject the Send Alert button above the map
+    const panel = document.getElementById('panel-live-map');
+    if (panel && !document.getElementById('sendAlertBtn')) {
+        const toolbar = document.createElement('div');
+        toolbar.style.cssText = 'display:flex;justify-content:flex-end;margin-bottom:12px;gap:8px;';
+        toolbar.innerHTML = `
+            <button id="viewAnnouncementsBtn" class="admin-btn-sm">📋 Announcements</button>
+            <button id="sendAlertBtn" class="admin-btn-primary" style="background:#C2410C;">
+                📢 Send Alert
+            </button>`;
+        panel.insertBefore(toolbar, panel.querySelector('.admin-stat-row'));
+
+        document.getElementById('sendAlertBtn')
+            .addEventListener('click', openSendAlertModal);
+        document.getElementById('viewAnnouncementsBtn')
+            .addEventListener('click', openAnnouncementsListModal);
+    }
+
     fetch('/admin/api/vehicles')
         .then(r => r.json())
         .then(data => {
@@ -904,4 +922,139 @@ function formatDatetime(iso) {
         month: 'short', day: 'numeric',
         hour: '2-digit', minute: '2-digit',
     });
+}
+// ─── Announcements ────────────────────────────────────────────────────────────
+
+const ROUTES = [
+    'Route A – Mangaldan',
+    'Route B – Calasiao',
+    'Route C – San Fabian',
+];
+
+function openSendAlertModal() {
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">📢 Send Alert to Students</h2>
+            <button class="modal-close">✕</button>
+        </div>
+        <form class="modal-form">
+            <label class="modal-label">Message</label>
+            <textarea
+                class="modal-input"
+                name="message"
+                rows="3"
+                maxlength="300"
+                placeholder="e.g. Route A will not be available until further notice."
+                required
+                style="resize:vertical;font-family:inherit;"></textarea>
+            <p id="charCount" style="font-size:11px;color:#9CA3AF;text-align:right;margin-top:-8px;">0 / 300</p>
+
+            <label class="modal-label">Scope</label>
+            <select class="modal-input" name="route">
+                <option value="">All routes</option>
+                ${ROUTES.map(r => `<option value="${r}">${r}</option>`).join('')}
+            </select>
+
+            <label class="modal-label">Expires</label>
+            <select class="modal-input" name="expires_preset">
+                <option value="">Today only (midnight)</option>
+                <option value="2h">In 2 hours</option>
+                <option value="4h">In 4 hours</option>
+                <option value="manual">Manual deactivation only</option>
+            </select>
+
+            <button type="submit" class="admin-btn-primary" style="width:100%;margin-top:4px;background:#C2410C;">
+                Send Alert
+            </button>
+        </form>
+    `, async (form) => {
+        const fd      = new FormData(form);
+        const message = fd.get('message').trim();
+        const route   = fd.get('route') || null;
+        const preset  = fd.get('expires_preset');
+
+        let expires_at = null;
+        if (preset === '2h')    expires_at = new Date(Date.now() + 2 * 3600000).toISOString();
+        if (preset === '4h')    expires_at = new Date(Date.now() + 4 * 3600000).toISOString();
+        if (!preset || preset === '') {
+            // Today only — expires at midnight local time
+            const midnight = new Date();
+            midnight.setHours(23, 59, 59, 999);
+            expires_at = midnight.toISOString();
+        }
+        // 'manual' leaves expires_at null
+
+        await apiFetch('/admin/api/announcements', 'POST', { message, route, expires_at });
+        closeModal();
+    });
+
+    // Live char counter
+    const box = document.getElementById('modalBox');
+    const textarea = box?.querySelector('textarea[name="message"]');
+    const counter  = box?.querySelector('#charCount');
+    textarea?.addEventListener('input', () => {
+        if (counter) counter.textContent = `${textarea.value.length} / 300`;
+    });
+}
+
+async function openAnnouncementsListModal() {
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">📋 Active Announcements</h2>
+            <button class="modal-close">✕</button>
+        </div>
+        <div id="announcementsList" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+            <p style="color:#9CA3AF;font-size:13px;">Loading…</p>
+        </div>
+    `);
+
+    const announcements = await apiFetch('/admin/api/announcements', 'GET');
+    const list = document.getElementById('announcementsList');
+    if (!list) return;
+
+    const active = announcements.filter(a => a.is_active);
+
+    if (!active.length) {
+        list.innerHTML = '<p style="font-size:13px;color:#9CA3AF;text-align:center;padding:16px 0;">No active announcements.</p>';
+        return;
+    }
+
+    list.innerHTML = active.map(a => `
+        <div class="admin-announcement-row" data-id="${a.id}">
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:12px;font-weight:700;color:#C2410C;margin-bottom:3px;">
+                    ${a.route ? a.route : 'All routes'}
+                    ${a.expires_at ? `· expires ${formatDatetime(a.expires_at)}` : '· manual deactivation'}
+                </div>
+                <p style="font-size:13px;color:#111827;margin:0;line-height:1.4;">${escapeHtml(a.message)}</p>
+                <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">Sent by ${a.created_by} · ${formatTimeAgo(a.created_at)}</div>
+            </div>
+            <button class="admin-btn-sm danger deactivate-btn" data-id="${a.id}" style="flex-shrink:0;">
+                Deactivate
+            </button>
+        </div>
+    `).join('');
+
+    list.querySelectorAll('.deactivate-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            setLoading(btn, true, 'Deactivating…');
+            try {
+                await apiFetch(`/admin/api/announcements/${btn.dataset.id}/deactivate`, 'POST');
+                btn.closest('.admin-announcement-row').remove();
+                if (!list.querySelector('.admin-announcement-row')) {
+                    list.innerHTML = '<p style="font-size:13px;color:#9CA3AF;text-align:center;padding:16px 0;">No active announcements.</p>';
+                }
+            } finally {
+                setLoading(btn, false, 'Deactivate');
+            }
+        });
+    });
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }

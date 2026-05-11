@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Broadcast;
 use App\Models\Shift;
 use App\Models\Vehicle;
 use App\Http\Controllers\Api\ShiftController;
+use App\Http\Controllers\Api\AnnouncementController;
 use App\Events\VehicleStatusChanged;
 
 Broadcast::routes(['middleware' => ['web']]);
@@ -128,4 +129,10 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
 
     Route::get('/api/shifts',    [AdminController::class, 'shifts']);
     Route::get('/api/analytics', [AdminController::class, 'analytics']);
+
+    // ─── Announcements ─────────────────────────────────────────────────────────
+    Route::get(   '/api/announcements',                        [AnnouncementController::class, 'index']);
+    Route::post(  '/api/announcements',                        [AnnouncementController::class, 'store']);
+    Route::post(  '/api/announcements/{announcement}/deactivate', [AnnouncementController::class, 'deactivate']);
+    Route::delete('/api/announcements/{announcement}',         [AnnouncementController::class, 'destroy']);
 });
