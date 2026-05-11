@@ -155,8 +155,8 @@ function bindBusStatusButton() {
     const btn = document.getElementById("busFullBtn");
 
     btn?.addEventListener("click", async () => {
-        if (!broadcasting){
-            alert("Start broadcasting first.");
+        if (!shiftActive){
+            alert("Start your shift first.");
             return;
         }
 
@@ -300,10 +300,10 @@ function syncBroadcastUI() {
     if (!btn) return;
  
     if (broadcasting) {
-        btn.textContent = "Broadcasting — ON";
+        btn.textContent = "Stop Broadcasting";
         btn.classList.replace("btnInactive", "btnActive");
     } else {
-        btn.textContent = "Broadcasting — OFF";
+        btn.textContent = "Start Broadcasting";
         btn.classList.replace("btnActive", "btnInactive");
         setGpsStatusText("Offline (GPS Paused)");
     }

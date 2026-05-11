@@ -38,11 +38,11 @@ let lastSeenISO      = null;    // ISO string for the last-seen ticker
 let previousGpsStatus = null;   // track previous status to fire toasts only on change
 
 export function initTracking() {
-    const container = document.getElementById("app");
-    if (!app || typeof L === 'undefined') {
-        console.error('Tracking: missing #app or Leaflet');
-        return;
-    }
+     const container = document.getElementById("app");
+     if (!container || typeof L === 'undefined') {
+         console.error('Tracking: missing #app or Leaflet');
+         return;
+     }
 
     const vehicleId      = container.dataset.vehicleId;
     const expectedDriverId = parseInt(container.dataset.driverId);
@@ -120,7 +120,7 @@ function loadInitialVehicle(vehicleId, app) {
                 lastWhisperTime = new Date(lastSeenISO).getTime();
             }
             // Reflect whatever state the vehicle is already in
-            applyGpsStatus(vehicle.gps_status, vehicle.last_seen);
+            applyGpsStatus(vehicle.gps_status, vehicle.last_seen, /* silent= */ true);
         })
         .catch(err => console.error("Failed to load vehicle:", err));
 }
@@ -183,9 +183,23 @@ function initRealtime(vehicleId, expectedDriverId) {
             return;
         }
 
+        if (vehicle.route_name) {
+            const currentRoute = document.getElementById('infoRoute')?.textContent?.trim();
+            const newRoute     = vehicle.route_name.trim();
+ 
+            if (currentRoute && newRoute && currentRoute !== newRoute && currentRoute !== 'N/A') {
+                showToast(
+                    `🚌 Route changed to ${newRoute}`,
+                    'info',
+                    8000   // longer duration — students should have time to read it
+                );
+            }
+ 
+            setInfoField('infoRoute', newRoute);
+        }
+
         // Update panel fields that status-change events carry
         if (vehicle.is_full !== undefined) updateCapacityBadge(vehicle.is_full);
-        if (vehicle.route_name)           setInfoField('infoRoute', vehicle.route_name);
  
         lastSeenISO = vehicle.last_seen || lastSeenISO;
 

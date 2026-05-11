@@ -80,17 +80,22 @@ class VehicleController extends Controller
     //Updating the status of occupancy
     public function updateOccupancy(Request $request)
     {
-        $vehicle = Vehicle::first();
-
-        $vehicle->update([
-            'is_full' => $request->is_full,
+        // Was: Vehicle::first() — always hit the first row in the DB regardless
+        // of which driver made the request. Broken with more than one vehicle.
+        $vehicle = Vehicle::where('user_id', auth()->id())->firstOrFail();
+ 
+        $validated = $request->validate([
+            'is_full' => 'required|boolean',
         ]);
-
-        // broadcast update
+ 
+        $vehicle->update(['is_full' => $validated['is_full']]);
+ 
+        $vehicle->refresh();
+ 
         broadcast(new \App\Events\VehicleStatusChanged($vehicle));
-
+ 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'is_full' => $vehicle->is_full,
         ]);
     }

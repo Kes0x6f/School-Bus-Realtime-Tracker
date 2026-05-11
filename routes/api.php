@@ -3,27 +3,31 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\GpsController;
 use App\Http\Controllers\Api\VehicleController;
+use App\Http\Controllers\Api\RouteController;
 
-Route::post('/gps/update', [GpsController::class, 'update']);
-
-Route::get('/gps/latest/{vehicleId}', [GpsController::class, 'latest']);
-
-Route::get('/vehicles', [VehicleController::class, 'index']);
+// ─── Public read-only ─────────────────────────────────────────────────────────
+// These are read-only and consumed by the student tracking page.
+// They return no sensitive data — just vehicle position and status.
 
 Route::get('/vehicles/active', [VehicleController::class, 'activeVehicles']);
+Route::get('/vehicles/{id}',   [VehicleController::class, 'show']);
 
-Route::get('/vehicles/{id}', [VehicleController::class, 'show']);
+// ─── Authenticated (web session) ──────────────────────────────────────────────
+// The frontend sends cookies + CSRF headers (credentials: 'same-origin').
+// We include the 'web' middleware group so the session is started and
+// auth()->user() resolves correctly — no Sanctum needed.
 
-Route::post('/vehicles/occupancy', [VehicleController::class, 'updateOccupancy']);
+Route::middleware(['web', 'auth'])->group(function () {
 
-Route::post('/test', function () {
-    return response()->json(['success' => true]);
-});
+    // Driver-only mutations
+    Route::middleware('role:driver')->group(function () {
+        Route::post('/gps/update',       [GpsController::class, 'update']);
+        Route::post('/vehicles/occupancy', [VehicleController::class, 'updateOccupancy']);
+        Route::post('/driver/route',       [RouteController::class, 'update']);
+    });
 
-Route::get('/debug-broadcast', function () {
-    $vehicle = \App\Models\Vehicle::find(1);
-    $vehicle->latitude = 16.051 + rand(-100,100)/10000;
-    $vehicle->longitude = 120.340 + rand(-100,100)/10000;
-    event(new \App\Events\VehicleLocationUpdated($vehicle));
-    return "event fired";
+    // Admin or internal — full vehicle list with computed gps_status
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/vehicles', [VehicleController::class, 'index']);
+    });
 });

@@ -2,11 +2,11 @@
 
 @section('content')
 
-<!--
-     TRACKING PAGE
-     data-* attributes carry server-side state into tracking.js so the
-     JS can render the correct initial UI without a second API round-trip.
--->
+{{--
+    TRACKING PAGE
+    data-* attributes carry server-side state into tracking.js so the
+    JS can render the correct initial UI without a second API round-trip.
+--}}
 
 <div class="fullScreen"
     id="app"
@@ -27,31 +27,27 @@
     <!-- MAP CONTAINER -->
     <div id="mapContainer" class="mapContainer" style="position: relative;">
         <div id="map" style="width:100%; height:100%; border-radius:10px;"></div>
-        <! -- Floating Status Pill -->
+
+        <!-- Floating Status Pill -->
         <div id="statusPill" class="map-status-pill">
             <span id="statusPillDot" class="pill-dot"></span>
             <span id="statusPillText">Loading…</span>
         </div>
 
-        <! --  =====================================================================
-        OVERLAYS & BANNERS
-        All hidden by default; tracking.js controls visibility.
-        ===================================================================== -->
-    
-        <! --  No-signal banner (sticky, bottom of map) -->
+        <!-- No-signal banner (sticky, bottom of map) -->
         <div id="noSignalBanner" class="tracking-banner tracking-banner-danger hidden">
             <span id="noSignalBannerText">⚠ No GPS signal</span>
         </div>
-        
-        <! --  Idle banner -->
+
+        <!-- Idle banner -->
         <div id="idleBanner" class="tracking-banner tracking-banner-warning hidden">
             🚌 Vehicle is currently stopped or idling
         </div>
-        
-        <! --  Toast notification stack -->
+
+        <!-- Toast notification stack -->
         <div id="toastStack" class="toast-stack" aria-live="polite"></div>
-        
-        <! --  Shift-ended full-screen modal -->
+
+        <!-- Shift-ended full-screen modal -->
         <div id="shiftEndedOverlay" class="tracking-overlay hidden" role="dialog" aria-modal="true">
             <div class="shift-ended-card">
                 <div class="shift-ended-icon">🚌</div>
@@ -69,10 +65,10 @@
         </div>
     </div>
 
-    <!-- Vechicle Info -->
+    <!-- Vehicle Info -->
     <div id="infoPanel" class="tracking-info-panel">
- 
-        <! --  Row 1: Route + Capacity -->
+
+        <!-- Row 1: Route + Capacity -->
         <div class="info-row info-row-space">
             <div>
                 <p class="info-label">ROUTE</p>
@@ -84,16 +80,16 @@
                 {{ $vehicle->is_full ? 'FULL' : 'SEATS AVAILABLE' }}
             </div>
         </div>
- 
-        <! --  Row 2: Driver -->
+
+        <!-- Row 2: Driver -->
         <div class="info-col">
             <p class="info-label">DRIVER</p>
             <p id="infoDriver" class="info-value">
                 {{ $vehicle->user->name ?? 'Unknown' }}
             </p>
         </div>
- 
-        <! --  Row 3: Speed / Last update / Shift started -->
+
+        <!-- Row 3: Speed / Last update / Shift started -->
         <div class="info-grid">
             <div class="info-col">
                 <p class="info-label">SPEED</p>
@@ -116,20 +112,23 @@
                 </p>
             </div>
         </div>
- 
-    </div>
 
-    
+    </div>
 
     <!-- BACK BUTTON -->
     <a href="/student/active-jeeps" class="primaryButtonWide" style="text-align:center; display:block; text-decoration:none;">
         ← Back to List
     </a>
-    <a href="/" class="backButton" style="text-align:center; display:block; text-decoration:none; margin-top:8px;">
+
+    <!-- Logout as a subdued text link — not alarming red -->
+    <a href="/logout" onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+       style="display:block; text-align:center; margin-top:12px; font-size:13px; color:#999; text-decoration:none; padding:8px;">
         Logout
     </a>
+    <form id="logout-form" method="POST" action="/logout" style="display:none;">
+        @csrf
+    </form>
 
 </div>
-
 
 @endsection

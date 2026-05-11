@@ -48,10 +48,19 @@
     <!-- ROUTE -->
     <div class="section-card slide-in">
         <p class="section-label">Route</p>
-        <select id="routeSelect">
-            <option>Route A – Mangaldan</option>
-            <option>Route B – Calasiao</option>
-            <option>Route C – San Fabian</option>
+        <select id="routeSelect" class="input">
+            <option value="Route A – Mangaldan"
+                {{ $vehicle->route_name === 'Route A – Mangaldan' ? 'selected' : '' }}>
+                Route A – Mangaldan
+            </option>
+            <option value="Route B – Calasiao"
+                {{ $vehicle->route_name === 'Route B – Calasiao' ? 'selected' : '' }}>
+                Route B – Calasiao
+            </option>
+            <option value="Route C – San Fabian"
+                {{ $vehicle->route_name === 'Route C – San Fabian' ? 'selected' : '' }}>
+                Route C – San Fabian
+            </option>
         </select>
     </div>
 

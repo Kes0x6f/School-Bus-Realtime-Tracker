@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Shift;
 use App\Models\Vehicle;
 use App\Events\VehicleStatusChanged;
 use Illuminate\Http\Request;
@@ -11,17 +12,18 @@ use Illuminate\Support\Facades\Auth;
 class ShiftController extends Controller
 {
     /**
-     * Driver starts their shift.
-     * Sets shift_active = true, resets GPS state.
+     * POST /driver/shift/start
      *
-     * POST /api/driver/shift/start
+     * Accepts route_name from the driver's selected dropdown so the
+     * active-jeeps card shows the correct route immediately on shift start,
+     * not the stale route_name from the previous shift.
      */
     public function start(Request $request)
     {
-        \Log::info('DEBUG SHIFT START', [
-            'auth_id' => Auth::id(),
-            'vehicle' => Vehicle::where('user_id', Auth::id())->first()
+        $validated = $request->validate([
+            'route_name' => 'nullable|string|max:255',
         ]);
+
         $vehicle = Vehicle::where('user_id', Auth::id())->firstOrFail();
 
         if ($vehicle->shift_active) {
@@ -35,11 +37,11 @@ class ShiftController extends Controller
             'shift_active'     => true,
             'shift_started_at' => now(),
             'shift_ended_at'   => null,
-            'is_active'        => false, // GPS not yet active; will flip true on first update
+            'is_active'        => false,
+            'route_name'       => $validated['route_name'] ?? $vehicle->route_name,
         ]);
 
         $vehicle->refresh();
-
         broadcast(new VehicleStatusChanged($vehicle));
 
         return response()->json([
@@ -50,15 +52,13 @@ class ShiftController extends Controller
                 'shift_active'     => $vehicle->shift_active,
                 'shift_started_at' => $vehicle->shift_started_at,
                 'gps_status'       => $vehicle->gps_status,
+                'route_name'       => $vehicle->route_name,
             ],
         ]);
     }
 
     /**
-     * Driver ends their shift manually.
-     * Sets shift_active = false, stops GPS tracking expectations.
-     *
-     * POST /api/driver/shift/end
+     * POST /driver/shift/end
      */
     public function end(Request $request)
     {
@@ -71,6 +71,8 @@ class ShiftController extends Controller
             ], 422);
         }
 
+        Shift::log($vehicle, 'manual');
+
         $vehicle->update([
             'shift_active'   => false,
             'shift_ended_at' => now(),
@@ -78,7 +80,6 @@ class ShiftController extends Controller
         ]);
 
         $vehicle->refresh();
-
         broadcast(new VehicleStatusChanged($vehicle));
 
         return response()->json([

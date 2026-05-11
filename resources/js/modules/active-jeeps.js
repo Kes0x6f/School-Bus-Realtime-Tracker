@@ -22,6 +22,7 @@ export function initActiveJeeps() {
 
     subscribeToVehicleChannels(vehicleIds);
     subscribeToGlobalChannel(container);
+    initRouteFilter();
 }
 
 // ─── Channel subscriptions ───────────────────────────────────────────────────
@@ -207,4 +208,26 @@ function formatTimeAgo(lastSeen) {
     if (diffSec < 60)  return `${diffSec}s ago`;
     if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
     return `${Math.floor(diffSec / 3600)}h ago`;
+}
+
+// ─── Route filter ─────────────────────────────────────────────────────────────
+
+function initRouteFilter() {
+    const select = document.getElementById('routeFilter');
+    if (!select) return;
+
+    select.addEventListener('change', () => {
+        const selected = select.value;
+        const cards    = document.querySelectorAll('[data-vehicle-id]');
+        let   visible  = 0;
+
+        cards.forEach(card => {
+            const match = selected === 'all' || card.dataset.route === selected;
+            card.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+
+        const msg = document.getElementById('noResultsMsg');
+        if (msg) msg.style.display = visible === 0 ? 'block' : 'none';
+    });
 }
