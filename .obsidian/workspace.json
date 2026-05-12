@@ -1,0 +1,212 @@
+{
+  "main": {
+    "id": "a5a542a3b45bc23c",
+    "type": "split",
+    "children": [
+      {
+        "id": "b7b3d9f811c9ef34",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f02c413dba7b2ee9",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "README.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "README"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "5bd1a45800751e52",
+    "type": "split",
+    "children": [
+      {
+        "id": "73acebe449fd3584",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d75094d913a30410",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "b7b4de76a5db3dd3",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "ae4c077a080fb2d2",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 200
+  },
+  "right": {
+    "id": "a99cc675d36e3a3a",
+    "type": "split",
+    "children": [
+      {
+        "id": "245aa963a5416b60",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d7313bd59fc9e63d",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "README.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for README"
+            }
+          },
+          {
+            "id": "493037100540a4cb",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "README.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from README"
+            }
+          },
+          {
+            "id": "f929d74c9990fe17",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "144369a476daa6c6",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "adbe7f9f43f6f2fe",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "README.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of README"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "f02c413dba7b2ee9",
+  "lastOpenFiles": [
+    "assets/admin-analytics.jpg",
+    "assets/admin-shifts.jpg",
+    "assets/admin-users.jpg",
+    "assets/admin.md",
+    "README.md",
+    "assets/admin shifts.jpg",
+    "assets/admin users.jpg",
+    "assets/admin analytics.jpg",
+    "assets/vehicle.jpg",
+    "storage/framework/sessions/zcrm6xWKhL35E407dIZ4O535YNwbNPaf0CZWm7Uh",
+    "storage/framework/sessions/yMeizE05ehM84b9m7rxAhltKZzWWSszxyICXgR1V",
+    "storage/framework/sessions/h3tjvfznxyAiK0R7i2PH6GlAaCoD233KydGiWb3u",
+    "assets/active.jpg",
+    "assets/admin.jpg",
+    "assets/tracking.jpg",
+    "assets/driver.jpg",
+    "storage/framework/sessions/UpcuDtuhblHz8s2eryYVbe43ZBUmlzgn9SXzfDCl",
+    "storage/framework/sessions/CooEna6rD9qzdj5w5njwqlDt5rZbcwRBK7VdRCZX",
+    "storage/framework/sessions/AP5tssUWhoq36NbijSJ9bsVWfzkpMZfosj8A7LmH",
+    "storage/framework/sessions/oD2UCD369jTKYUDJ11NywPltgcNdNYRfvAHdSjG4",
+    "storage/framework/sessions/z3MWMLvX2eBwvSRDpBm9DT0vEfple7IrLLl6mmnE",
+    "storage/framework/sessions/TpSCunNRY3i5GcEa6dyZyMjQ3TTACZ2xE63Ef4bO",
+    "storage/framework/sessions/yizlIKVUHBv7Wh9yIcRY62pCsQQ4X81AQQLnN4oS"
+  ]
+}
