@@ -19,20 +19,70 @@ Drivers broadcast their GPS live from their phones. Students watch the map updat
 
 ## Screenshots
 
-| Student — Active Jeeps                                                                   | Student — Live Tracking                                                            |
-| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| ![Active jeeps list showing route cards with live status badges\|283](assets/active.jpg) | ![Tracking page with Leaflet map and vehicle info panel\|295](assets/tracking.jpg) |
+Click any screenshot to open the full-size image.
 
-| Driver Dashboard                                                                             |     |
-| -------------------------------------------------------------------------------------------- | --- |
-| ![Admin dashboard showing live map with vehicle markers and sidebar\|224](assets/driver.jpg) |     |
+### Student Pages
 
+<table>
+  <tr>
+    <td width="30%">
+      <a href="assets/active.jpg">
+        <img src="assets/active.jpg" alt="Student active jeepneys page" width="50%">
+      </a>
+      <p align="center"><strong>Active Jeepneys</strong></p>
+    </td>
+    <td width="30%">
+      <a href="assets/tracking.jpg">
+        <img src="assets/tracking.jpg" alt="Student live tracking page with map and vehicle details" width="50%">
+      </a>
+      <p align="center"><strong>Live Tracking</strong></p>
+    </td>
+  </tr>
+</table>
 
-| Admin — Live Map                                                                                                                                                                            |                                                                                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ![Admin dashboard showing live map with vehicle markers and sidebar\|347](assets/admin.jpg)![Admin dashboard showing live map with vehicle markers and sidebar](assets/admin-analytics.jpg) | ![Admin dashboard showing live map with vehicle markers and sidebar\|339](assets/admin-users.jpg)![Admin dashboard showing live map with vehicle markers and sidebar](assets/admin-shifts.jpg) |
-|                                                                                                                                                                                             |                                                                                                                                                                                                |
+### Driver Page
 
+<p align="center">
+  <a href="assets/driver.jpg">
+    <img src="assets/driver.jpg" alt="Driver dashboard showing route, GPS, shift, and capacity controls" width="30%">
+  </a>
+</p>
+
+<p align="center">
+  <strong>Driver Dashboard</strong>
+</p>
+### Admin Pages
+
+<table>
+  <tr>
+    <td width="50%">
+      <a href="assets/admin.jpg">
+        <img src="assets/admin.jpg" alt="Admin live map dashboard with vehicle markers and sidebar" width="100%">
+      </a>
+      <p align="center"><strong>Live Map</strong></p>
+    </td>
+    <td width="50%">
+      <a href="assets/admin-analytics.jpg">
+        <img src="assets/admin-analytics.jpg" alt="Admin analytics page with charts and fleet statistics" width="100%">
+      </a>
+      <p align="center"><strong>Analytics</strong></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <a href="assets/admin-users.jpg">
+        <img src="assets/admin-users.jpg" alt="Admin users management page" width="100%">
+      </a>
+      <p align="center"><strong>User Management</strong></p>
+    </td>
+    <td width="50%">
+      <a href="assets/admin-shifts.jpg">
+        <img src="assets/admin-shifts.jpg" alt="Admin shifts log page" width="100%">
+      </a>
+      <p align="center"><strong>Shift Logs</strong></p>
+    </td>
+  </tr>
+</table>
 
 ---
 
