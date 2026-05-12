@@ -19,19 +19,19 @@ Drivers broadcast their GPS live from their phones. Students watch the map updat
 
 ## Screenshots
 
-| Student — Active Jeeps                                                              | Student — Live Tracking                                                       |
-| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| ![Active jeeps list showing route cards with live status badges](assets/active.jpg) | ![Tracking page with Leaflet map and vehicle info panel](assets/tracking.jpg) |
+| Student — Active Jeeps                                                                   | Student — Live Tracking                                                            |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| ![Active jeeps list showing route cards with live status badges\|283](assets/active.jpg) | ![Tracking page with Leaflet map and vehicle info panel\|295](assets/tracking.jpg) |
 
-| Driver Dashboard                                                                             |
-| -------------------------------------------------------------------------------------------- |
-| ![Admin dashboard showing live map with vehicle markers and sidebar\|338](assets/driver.jpg) |
+| Driver Dashboard                                                                             |     |
+| -------------------------------------------------------------------------------------------- | --- |
+| ![Admin dashboard showing live map with vehicle markers and sidebar\|224](assets/driver.jpg) |     |
 
 
-| Admin — Live Map                                                                                                                                                                                                                                                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ![Admin dashboard showing live map with vehicle markers and sidebar](assets/admin.jpg)![Admin dashboard showing live map with vehicle markers and sidebar](assets/admin-users.jpg)![Admin dashboard showing live map with vehicle markers and sidebar](assets/admin-shifts.jpg)![Admin dashboard showing live map with vehicle markers and sidebar](assets/admin-analytics.jpg) |
-|                                                                                                                                                                                                                                                                                                                                                                                 |
+| Admin — Live Map                                                                                                                                                                            |                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Admin dashboard showing live map with vehicle markers and sidebar\|347](assets/admin.jpg)![Admin dashboard showing live map with vehicle markers and sidebar](assets/admin-analytics.jpg) | ![Admin dashboard showing live map with vehicle markers and sidebar\|339](assets/admin-users.jpg)![Admin dashboard showing live map with vehicle markers and sidebar](assets/admin-shifts.jpg) |
+|                                                                                                                                                                                             |                                                                                                                                                                                                |
 
 
 ---
