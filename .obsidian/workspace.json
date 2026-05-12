@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "README.md",
+                "file": "DOCS.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "README"
+              "title": "DOCS"
             }
           }
         ]
@@ -183,13 +183,14 @@
       "bases:Create new base": false
     }
   },
-  "active": "f02c413dba7b2ee9",
+  "active": "d75094d913a30410",
   "lastOpenFiles": [
+    "README.md",
+    "DOCS.md",
     "assets/admin-analytics.jpg",
     "assets/admin-shifts.jpg",
     "assets/admin-users.jpg",
     "assets/admin.md",
-    "README.md",
     "assets/admin shifts.jpg",
     "assets/admin users.jpg",
     "assets/admin analytics.jpg",
@@ -200,7 +201,6 @@
     "assets/active.jpg",
     "assets/admin.jpg",
     "assets/tracking.jpg",
-    "assets/driver.jpg",
     "storage/framework/sessions/UpcuDtuhblHz8s2eryYVbe43ZBUmlzgn9SXzfDCl",
     "storage/framework/sessions/CooEna6rD9qzdj5w5njwqlDt5rZbcwRBK7VdRCZX",
     "storage/framework/sessions/AP5tssUWhoq36NbijSJ9bsVWfzkpMZfosj8A7LmH",
