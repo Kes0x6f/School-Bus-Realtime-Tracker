@@ -3,11 +3,19 @@
 use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('vehicle.{id}', function ($user, $id) {
-    return true;
+    if (in_array($user->role, ['student', 'admin'])) {
+        return true;
+    }
+ 
+    if ($user->role === 'driver') {
+        return $user->vehicle?->id === (int) $id;
+    }
+ 
+    return false;
 });
 
 Broadcast::channel('vehicles', function ($user) {
-    return true;
+    return in_array($user->role, ['student', 'admin', 'driver']);
 });
 
 // Public channel — students don't need auth to receive announcements.

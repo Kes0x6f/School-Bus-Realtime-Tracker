@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\RateLimiter;
 use App\Models\Shift;
 use App\Models\Vehicle;
 use App\Http\Controllers\Api\ShiftController;
@@ -35,7 +36,27 @@ Route::post('/login', function (Request $request) {
         'password' => 'required',
     ]);
 
+    // ── Brute-force protection ────────────────────────────────────────────────
+    // Key combines the lower-cased email + IP so:
+    //   • A single attacker cycling IPs is still throttled per email.
+    //   • A shared IP (e.g. school WiFi) doesn't lock out legitimate users
+    //     just because one person mistyped their password a few times.
+    // Limit: 6 attempts per 60 seconds.
+    $throttleKey = strtolower($request->input('email')) . '|' . $request->ip();
+
+    if (RateLimiter::tooManyAttempts($throttleKey, 6)) {
+        $seconds = RateLimiter::availableIn($throttleKey);
+
+        return redirect()->route('login')
+            ->withErrors(['email' => "Too many login attempts. Please try again in {$seconds} seconds."])
+            ->withInput($request->only('email'));
+    }
+
     if (Auth::attempt($credentials)) {
+        // Clear the rate-limit bucket on successful login so the counter
+        // doesn't carry over to the next session.
+        RateLimiter::clear($throttleKey);
+
         $request->session()->regenerate();
 
         if (!Auth::user()->is_active) {
@@ -52,6 +73,11 @@ Route::post('/login', function (Request $request) {
         };
     }
 
+    // Increment the failure counter. Decay window: 60 seconds.
+    RateLimiter::hit($throttleKey, 60);
+
+    // Return a generic message — do NOT reveal whether the email exists or
+    // whether it was the password that was wrong (account enumeration).
     return redirect()->route('login')
         ->withErrors(['email' => 'Invalid credentials.'])
         ->withInput($request->only('email'));
@@ -60,6 +86,9 @@ Route::post('/login', function (Request $request) {
 Route::post('/logout', function (Request $request) {
     $user = Auth::user();
 
+    // ── Auto-end shift on driver logout ───────────────────────────────────────
+    // Prevents a vehicle from staying on the active list after the driver
+    // closes their browser without explicitly ending the shift.
     if ($user && $user->role === 'driver') {
         $vehicle = Vehicle::where('user_id', $user->id)
                           ->where('shift_active', true)
@@ -80,6 +109,9 @@ Route::post('/logout', function (Request $request) {
     }
 
     Auth::logout();
+
+    // Invalidate + regenerate the session token so the old session ID
+    // cannot be reused even if someone has a copy of the cookie.
     $request->session()->invalidate();
     $request->session()->regenerateToken();
 
@@ -131,8 +163,8 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::get('/api/analytics', [AdminController::class, 'analytics']);
 
     // ─── Announcements ─────────────────────────────────────────────────────────
-    Route::get(   '/api/announcements',                        [AnnouncementController::class, 'index']);
-    Route::post(  '/api/announcements',                        [AnnouncementController::class, 'store']);
+    Route::get(   '/api/announcements',                           [AnnouncementController::class, 'index']);
+    Route::post(  '/api/announcements',                           [AnnouncementController::class, 'store']);
     Route::post(  '/api/announcements/{announcement}/deactivate', [AnnouncementController::class, 'deactivate']);
-    Route::delete('/api/announcements/{announcement}',         [AnnouncementController::class, 'destroy']);
+    Route::delete('/api/announcements/{announcement}',            [AnnouncementController::class, 'destroy']);
 });
