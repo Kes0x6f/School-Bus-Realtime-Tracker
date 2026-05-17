@@ -137,8 +137,9 @@ Route::middleware(['auth', 'role:driver'])->group(function () {
 // ─── Student ──────────────────────────────────────────────────────────────────
 
 Route::middleware(['auth', 'role:student,admin'])->group(function () {
-    Route::get('/student/active-jeeps', [StudentController::class, 'active']);
-    Route::get('/student/track/{id}',   [StudentController::class, 'track']);
+    Route::get('/student/active-jeeps',     [StudentController::class, 'active']);
+    Route::get('/student/track/{id}',       [StudentController::class, 'track']);
+    Route::post('/student/change-password', [StudentController::class, 'changePassword']);
 });
 
 // ─── Admin ────────────────────────────────────────────────────────────────────

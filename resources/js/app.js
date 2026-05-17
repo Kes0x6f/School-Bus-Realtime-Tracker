@@ -6,6 +6,7 @@ import { initAuthPage }         from "./modules/login";
 import { initDriverDashboard }  from "./modules/driver-dashboard";
 import { initAdminDashboard }   from "./modules/admin-dashboard";
 import { initAnnouncements }    from "./modules/announcements";
+import { initStudentPasswordModal } from "./modules/student";
 
 document.addEventListener("DOMContentLoaded", () => {
     const app  = document.getElementById("app");
@@ -19,14 +20,14 @@ document.addEventListener("DOMContentLoaded", () => {
     switch (page) {
         case "tracking":
             initTracking();
-            // Only show announcements relevant to this vehicle's route
             initAnnouncements(app.dataset.route || null);
+            initStudentPasswordModal();
             break;
 
         case "active-jeeps":
             initActiveJeeps();
-            // Show all active announcements — no route filter
             initAnnouncements(null);
+            initStudentPasswordModal();
             break;
 
         case "auth":

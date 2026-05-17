@@ -21,7 +21,47 @@
     data-shift-started="{{ $vehicle->shift_started_at?->toISOString() }}"
     data-is-full="{{ $vehicle->is_full ? '1' : '0' }}"
     data-plate="{{ $vehicle->plate_number ?? '' }}"
-    data-announcements='@json($announcements)'>
+    data-announcements='@json($announcements)'
+    style="position:relative;">
+
+    {{-- SETTINGS ICON — top right, subtle gear --}}
+    <button
+        onclick="document.getElementById('studentPwOverlay').classList.remove('hidden')"
+        aria-label="Account settings"
+        style="position:absolute;
+               top:16px;
+               right:16px;
+               width:36px;
+               height:36px;
+               border-radius:50%;
+               border:none;
+               background:rgba(0,0,0,0.06);
+               cursor:pointer;
+               display:flex;
+               align-items:center;
+               justify-content:center;
+               padding:0;
+               color:#555;
+               z-index:10;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+             viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83
+                     2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33
+                     1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09
+                     A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06
+                     a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15
+                     a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
+                     A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06
+                     a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68
+                     a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
+                     a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06
+                     a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9
+                     a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
+                     a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+    </button>
 
     <p class="pageLabelDark">TRACKING LOCATION</p>
 
@@ -35,7 +75,7 @@
             <span id="statusPillText">Loading…</span>
         </div>
 
-        <!-- No-signal banner (sticky, bottom of map) -->
+        <!-- No-signal banner -->
         <div id="noSignalBanner" class="tracking-banner tracking-banner-danger hidden">
             <span id="noSignalBannerText">⚠ No GPS signal</span>
         </div>
@@ -117,18 +157,90 @@
     </div>
 
     <!-- BACK BUTTON -->
-    <a href="/student/active-jeeps" class="primaryButtonWide" style="text-align:center; display:block; text-decoration:none;">
+    <a href="/student/active-jeeps" class="primaryButtonWide"
+       style="text-align:center; display:block; text-decoration:none;">
         ← Back to List
     </a>
 
-    <!-- Logout as a subdued text link — not alarming red -->
-    <a href="/logout" onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
-       style="display:block; text-align:center; margin-top:12px; font-size:13px; color:#999; text-decoration:none; padding:8px;">
+    <!-- Logout -->
+    <a href="/logout"
+       onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+       style="display:block;text-align:center;margin-top:12px;
+              font-size:13px;color:#999;text-decoration:none;padding:8px;">
         Logout
     </a>
     <form id="logout-form" method="POST" action="/logout" style="display:none;">
         @csrf
     </form>
+
+    {{-- ACCOUNT SETTINGS MODAL --}}
+    <div id="studentPwOverlay" class="modal-overlay hidden">
+        <div class="modal-box">
+
+            <div class="modal-header">
+                <h2 class="modal-title">Account Settings</h2>
+                <button class="modal-close"
+                        onclick="document.getElementById('studentPwOverlay').classList.add('hidden')">
+                    ✕
+                </button>
+            </div>
+
+            {{-- Contact admin notice --}}
+            <div style="background:#F0F4FF;
+                        border-left:3px solid #002D62;
+                        border-radius:6px;
+                        padding:10px 14px;
+                        margin-bottom:20px;">
+                <p style="font-size:12px;color:#002D62;margin:0;line-height:1.6;">
+                    To update your <strong>name</strong> or <strong>email address</strong>,
+                    please contact an administrator.
+                </p>
+            </div>
+
+            {{-- Section label --}}
+            <p style="font-size:11px;font-weight:600;color:#9CA3AF;
+                      text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">
+                Change Password
+            </p>
+
+            <div class="modal-form" id="studentPwForm">
+                <label class="modal-label">Current password</label>
+                <input class="modal-input" id="spwCurrent" type="password"
+                       placeholder="Your current password" autocomplete="current-password">
+
+                <label class="modal-label">New password</label>
+                <input class="modal-input" id="spwNew" type="password"
+                       placeholder="At least 8 characters" autocomplete="new-password">
+
+                <label class="modal-label">Confirm new password</label>
+                <input class="modal-input" id="spwConfirm" type="password"
+                       placeholder="Repeat new password" autocomplete="new-password">
+
+                <p id="spwHint" style="font-size:11px;color:#9CA3AF;min-height:16px;"></p>
+
+                <p id="spwError"
+                   style="font-size:12px;color:#DC2626;display:none;
+                          background:#FEE2E2;padding:8px 12px;border-radius:6px;">
+                </p>
+
+                <button id="spwSubmitBtn"
+                        onclick="submitStudentPasswordChange()"
+                        style="background:#002D62;color:#fff;border:none;
+                               padding:12px;border-radius:10px;font-size:14px;
+                               font-weight:600;cursor:pointer;width:100%;
+                               font-family:inherit;margin-top:4px;">
+                    Update password
+                </button>
+            </div>
+
+            <p id="spwSuccess"
+               style="display:none;font-size:13px;font-weight:600;color:#065F46;
+                      background:#D1FAE5;padding:12px;border-radius:8px;text-align:center;">
+                Password updated successfully.
+            </p>
+
+        </div>
+    </div>
 
 </div>
 
