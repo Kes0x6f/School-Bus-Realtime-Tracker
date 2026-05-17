@@ -150,6 +150,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::post('/api/users',                              [AdminController::class, 'storeUser']);
     Route::get('/api/users/import/template',               [AdminController::class, 'importTemplate']);
     Route::post('/api/users/import',                       [AdminController::class, 'importUsers']);
+    Route::post('/api/users/{user}/change-password',       [AdminController::class, 'changePassword']);
     Route::put( '/api/users/{user}',                       [AdminController::class, 'updateUser']);
     Route::post('/api/users/{user}/deactivate',            [AdminController::class, 'deactivateUser']);
     Route::post('/api/users/{user}/reactivate',            [AdminController::class, 'reactivateUser']);

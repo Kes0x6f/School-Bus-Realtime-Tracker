@@ -235,6 +235,7 @@ function renderUsersTable() {
                             : '<span class="badge b-red">Inactive</span>'}</td>
                         <td class="table-actions">
                             <span class="action-link" data-action="edit-user" data-id="${u.id}">Edit</span>
+                            <span class="action-link" data-action="change-password" data-id="${u.id}">Change password</span>
                             ${u.role === 'driver'
                                 ? `<span class="action-link" data-action="assign-vehicle" data-id="${u.id}">Reassign vehicle</span>`
                                 : ''}
@@ -284,6 +285,7 @@ function handleUserAction(action, userId, triggerEl) {
         case 'assign-vehicle':  return openAssignVehicleModal(user);
         case 'deactivate-user': return confirmDeactivateUser(user);
         case 'reactivate-user': return reactivateUser(user, triggerEl);
+        case 'change-password':      return openChangePasswordModal(user);
     }
 }
 
@@ -801,7 +803,6 @@ async function submitImport(form) {
     }
 }
 
-
 function openEditUserModal(user) {
     openModal(`
         <div class="modal-header">
@@ -825,6 +826,91 @@ function openEditUserModal(user) {
         const data = Object.fromEntries(new FormData(form));
         const res  = await apiFetch(`/admin/api/users/${user.id}`, 'PUT', data);
         if (res.status === 'success') { await refreshUsers(); closeModal(); }
+    });
+}
+
+function openChangePasswordModal(user) {
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Change password — ${escapeHtml(user.name)}</h2>
+            <button class="modal-close">✕</button>
+        </div>
+        <p style="font-size:12px;color:#6B7280;margin-bottom:12px;">
+            The user will need to use this new password on their next login.
+        </p>
+        <form class="modal-form">
+            <label class="modal-label">New password</label>
+            <input class="modal-input"
+                   name="password"
+                   type="password"
+                   minlength="8"
+                   placeholder="At least 8 characters"
+                   required
+                   autocomplete="new-password">
+
+            <label class="modal-label">Confirm new password</label>
+            <input class="modal-input"
+                   name="password_confirmation"
+                   type="password"
+                   minlength="8"
+                   placeholder="Repeat the password"
+                   required
+                   autocomplete="new-password">
+
+            <p id="passwordMatchHint"
+               style="font-size:11px;color:#9CA3AF;margin-top:-8px;">
+            </p>
+
+            <button type="submit"
+                    class="admin-btn-primary"
+                    style="width:100%;margin-top:4px;">
+                Set new password
+            </button>
+        </form>
+    `, async (form) => {
+        const password             = form.password.value;
+        const password_confirmation = form.password_confirmation.value;
+
+        // Client-side match check before hitting the server
+        if (password !== password_confirmation) {
+            document.getElementById('passwordMatchHint').textContent =
+                'Passwords do not match.';
+            document.getElementById('passwordMatchHint').style.color = '#DC2626';
+            throw new Error('Passwords do not match.'); // prevents modal from closing
+        }
+
+        const res = await apiFetch(
+            `/admin/api/users/${user.id}/change-password`,
+            'POST',
+            { password, password_confirmation }
+        );
+
+        if (res.status === 'success') {
+            closeModal();
+            // Show a brief confirmation toast instead of reloading the table —
+            // no visible data changed (the password hash is not displayed)
+            showAdminToast(`Password updated for ${user.name}.`);
+        }
+    });
+
+    // Live match indicator as the admin types the confirmation
+    const modal = document.getElementById('modalBox');
+    const confirmInput = modal?.querySelector('[name="password_confirmation"]');
+    const hint         = modal?.querySelector('#passwordMatchHint');
+
+    confirmInput?.addEventListener('input', () => {
+        const pw = modal.querySelector('[name="password"]').value;
+        if (!confirmInput.value) {
+            hint.textContent = '';
+            return;
+        }
+        if (confirmInput.value === pw) {
+            hint.textContent = '✓ Passwords match';
+            hint.style.color = '#065F46';
+        } else {
+            hint.textContent = 'Passwords do not match';
+            hint.style.color = '#DC2626';
+        }
     });
 }
 
@@ -1034,6 +1120,34 @@ async function apiFetch(url, method, body) {
     }
     return data;
 }
+
+function showAdminToast(message) {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: #111827;
+        color: #fff;
+        font-size: 13px;
+        padding: 10px 16px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        z-index: 9999;
+        opacity: 0;
+        transition: opacity 0.2s;
+    `;
+
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.style.opacity = '1');
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 250);
+    }, 3000);
+}
+
 
 function setText(id, val) {
     const el = document.getElementById(id);

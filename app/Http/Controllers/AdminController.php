@@ -419,5 +419,21 @@ class AdminController extends Controller
             'errors'  => $errors,
         ]);
     }
+public function changePassword(Request $request, User $user)
+{
+    $validated = $request->validate([
+        'password' => [
+            'required',
+            'string',
+            'min:8',
+            'confirmed', // expects password_confirmation field
+        ],
+    ]);
 
+    $user->update([
+        'password' => Hash::make($validated['password']),
+    ]);
+
+    return response()->json(['status' => 'success']);
+}
 }
