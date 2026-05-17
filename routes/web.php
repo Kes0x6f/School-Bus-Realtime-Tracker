@@ -148,6 +148,8 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
 
     Route::get( '/api/users',                              [AdminController::class, 'users']);
     Route::post('/api/users',                              [AdminController::class, 'storeUser']);
+    Route::get('/api/users/import/template',               [AdminController::class, 'importTemplate']);
+    Route::post('/api/users/import',                       [AdminController::class, 'importUsers']);
     Route::put( '/api/users/{user}',                       [AdminController::class, 'updateUser']);
     Route::post('/api/users/{user}/deactivate',            [AdminController::class, 'deactivateUser']);
     Route::post('/api/users/{user}/reactivate',            [AdminController::class, 'reactivateUser']);
@@ -167,4 +169,5 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::post(  '/api/announcements',                           [AnnouncementController::class, 'store']);
     Route::post(  '/api/announcements/{announcement}/deactivate', [AnnouncementController::class, 'deactivate']);
     Route::delete('/api/announcements/{announcement}',            [AnnouncementController::class, 'destroy']);
+
 });

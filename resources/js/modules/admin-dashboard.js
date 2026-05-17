@@ -272,6 +272,7 @@ function bindUserSearch() {
 
 function bindAddUserBtn() {
     document.getElementById('addUserBtn')?.addEventListener('click', () => openAddUserModal());
+    document.getElementById('importUsersBtn')?.addEventListener('click', () => openImportUsersModal());
 }
 
 function handleUserAction(action, userId, triggerEl) {
@@ -626,6 +627,180 @@ function openAddUserModal() {
         if (res.status === 'success') { await refreshUsers(); closeModal(); }
     });
 }
+
+function openImportUsersModal() {
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Import Users from CSV</h2>
+            <button class="modal-close">✕</button>
+        </div>
+
+        <p style="font-size:12px;color:#6B7280;margin-bottom:12px;">
+            Upload a CSV file with columns: <strong>name, email, password, role</strong>.
+            Rows with errors are skipped — the rest still import.
+        </p>
+
+        <a id="downloadTemplateLink"
+           href="/admin/api/users/import/template"
+           style="display:inline-block;font-size:12px;color:#185FA5;margin-bottom:16px;text-decoration:underline;">
+            ⬇ Download template CSV
+        </a>
+
+        <form class="modal-form" id="importForm" enctype="multipart/form-data">
+            <label class="modal-label">CSV File</label>
+
+            <div id="dropZone" style="
+                border: 2px dashed #D1D5DB;
+                border-radius: 8px;
+                padding: 24px;
+                text-align: center;
+                cursor: pointer;
+                transition: border-color 0.2s, background 0.2s;
+                margin-bottom: 4px;
+            ">
+                <p style="font-size:13px;color:#6B7280;margin:0;" id="dropLabel">
+                    Drag and drop your CSV here, or click to browse
+                </p>
+                <input type="file" name="csv_file" id="csvFileInput"
+                       accept=".csv,text/csv" style="display:none;">
+            </div>
+
+            <p id="selectedFileName"
+               style="font-size:11px;color:#9CA3AF;margin-top:4px;"></p>
+
+            <button type="submit" class="admin-btn-primary"
+                    style="width:100%;margin-top:12px;">
+                Import Users
+            </button>
+        </form>
+
+        <div id="importResults" style="display:none;margin-top:16px;"></div>
+    `);
+
+    initDropZone();
+}
+
+function initDropZone() {
+    const zone   = document.getElementById('dropZone');
+    const input  = document.getElementById('csvFileInput');
+    const label  = document.getElementById('dropLabel');
+    const nameEl = document.getElementById('selectedFileName');
+    const form   = document.getElementById('importForm');
+
+    // Click on zone opens file picker
+    zone.addEventListener('click', () => input.click());
+
+    // Drag-over visual feedback
+    zone.addEventListener('dragover', e => {
+        e.preventDefault();
+        zone.style.borderColor  = '#185FA5';
+        zone.style.background   = '#EFF6FF';
+    });
+
+    zone.addEventListener('dragleave', () => {
+        zone.style.borderColor = '#D1D5DB';
+        zone.style.background  = '';
+    });
+
+    // File dropped
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.style.borderColor = '#D1D5DB';
+        zone.style.background  = '';
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            // Assign the dropped file to the hidden input
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            nameEl.textContent = `Selected: ${file.name}`;
+            label.textContent  = file.name;
+        }
+    });
+
+    // File chosen via picker
+    input.addEventListener('change', () => {
+        if (input.files[0]) {
+            nameEl.textContent = `Selected: ${input.files[0].name}`;
+            label.textContent  = input.files[0].name;
+        }
+    });
+
+    // Form submission
+    form.addEventListener('submit', async e => {
+        e.preventDefault();
+        await submitImport(form);
+    });
+}
+
+async function submitImport(form) {
+    const submitBtn = form.querySelector('[type="submit"]');
+    const results   = document.getElementById('importResults');
+
+    if (!form.querySelector('#csvFileInput').files[0]) {
+        alert('Please select a CSV file first.');
+        return;
+    }
+
+    setLoading(submitBtn, true, 'Importing…');
+
+    const formData = new FormData(form);
+    formData.append('_token', CSRF());
+
+    try {
+        const res  = await fetch('/admin/api/users/import', {
+            method:      'POST',
+            credentials: 'same-origin',
+            headers: { 'X-CSRF-TOKEN': CSRF() },
+            body:        formData,
+            // Do NOT set Content-Type — the browser sets multipart/form-data
+            // with the correct boundary automatically
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.message ?? 'Import failed.');
+        }
+
+        // Show summary
+        results.style.display = 'block';
+
+        const errorHtml = data.errors.length
+            ? `<div style="margin-top:10px;">
+                   <p style="font-size:12px;font-weight:600;color:#991B1B;margin-bottom:6px;">
+                       ${data.errors.length} row(s) had errors and were skipped:
+                   </p>
+                   <ul style="font-size:11px;color:#6B7280;padding-left:16px;max-height:160px;overflow-y:auto;">
+                       ${data.errors.map(e => `<li style="margin-bottom:4px;">${escapeHtml(e)}</li>`).join('')}
+                   </ul>
+               </div>`
+            : '';
+
+        results.innerHTML = `
+            <div style="background:${data.created > 0 ? '#D1FAE5' : '#FEF3C7'};
+                        border-radius:6px;padding:12px;">
+                <p style="font-size:13px;font-weight:600;
+                           color:${data.created > 0 ? '#065F46' : '#92400E'};margin:0;">
+                    ${data.created > 0
+                        ? `✓ ${data.created} user${data.created !== 1 ? 's' : ''} imported successfully`
+                        : 'No users were imported'}
+                </p>
+            </div>
+            ${errorHtml}`;
+
+        // Refresh the users table so the new accounts appear immediately
+        if (data.created > 0) {
+            await refreshUsers();
+        }
+
+    } catch (err) {
+        alert(err.message ?? 'Something went wrong during import.');
+    } finally {
+        setLoading(submitBtn, false, 'Import Users');
+    }
+}
+
 
 function openEditUserModal(user) {
     openModal(`

@@ -9,7 +9,7 @@ window.Echo = new Echo({
     wsHost: window.location.hostname,
     wsPort: 443,
     wssPort: 443,
-    wsPath: '/app',
+    wsPath: '',
     forceTLS: true,
     withCredentials: true, 
 

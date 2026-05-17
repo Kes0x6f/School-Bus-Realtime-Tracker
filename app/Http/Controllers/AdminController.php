@@ -299,4 +299,125 @@ class AdminController extends Controller
             'total_drivers'      => User::where('role', 'driver')->where('is_active', true)->count(),
         ]);
     }
+
+    // ─── Batch Import ────────────────────────────────────────────────────────────
+    public function importTemplate()
+    {
+        $headers = [
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="users-import-template.csv"',
+        ];
+
+        $rows = [
+            ['name', 'email', 'password', 'role'],
+            ['Juan dela Cruz', 'juan@example.com', 'Password123', 'student'],
+            ['Maria Santos',   'maria@example.com', 'Password123', 'driver'],
+        ];
+
+        $callback = function () use ($rows) {
+            $handle = fopen('php://output', 'w');
+            foreach ($rows as $row) {
+                fputcsv($handle, $row);
+            }
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    public function importUsers(Request $request)
+    {
+        // Validate that a file was uploaded and is a CSV/plain-text type.
+        // The MIME check is intentionally broad because browsers report CSV
+        // as different types on different operating systems.
+        $request->validate([
+            'csv_file' => [
+                'required',
+                'file',
+                'max:2048', // 2 MB ceiling — a CSV of 10,000 users is well under this
+                function ($attribute, $value, $fail) {
+                    $allowed = ['text/csv', 'text/plain', 'application/csv',
+                                'application/vnd.ms-excel', 'application/octet-stream'];
+                    if (!in_array($value->getMimeType(), $allowed)) {
+                        $fail('The file must be a CSV.');
+                    }
+                },
+            ],
+        ]);
+
+        $file    = $request->file('csv_file');
+        $handle  = fopen($file->getRealPath(), 'r');
+
+        $created = 0;
+        $errors  = [];
+        $rowNum  = 0;
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNum++;
+
+            // Skip the header row
+            if ($rowNum === 1) {
+                continue;
+            }
+
+            // Skip completely blank rows (common when exporting from Excel)
+            if (empty(array_filter($row))) {
+                continue;
+            }
+
+            // Expect exactly 4 columns
+            if (count($row) < 4) {
+                $errors[] = "Row {$rowNum}: Expected 4 columns (name, email, password, role) — got " . count($row) . '.';
+                continue;
+            }
+
+            [$name, $email, $password, $role] = array_map('trim', $row);
+
+            // Per-row validation
+            $rowErrors = [];
+
+            if (empty($name) || strlen($name) > 255) {
+                $rowErrors[] = 'name is required and must be under 255 characters';
+            }
+
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $rowErrors[] = "email \"{$email}\" is not valid";
+            } elseif (User::where('email', $email)->exists()) {
+                $rowErrors[] = "email \"{$email}\" is already registered";
+            }
+
+            if (strlen($password) < 8) {
+                $rowErrors[] = 'password must be at least 8 characters';
+            }
+
+            $role = strtolower($role);
+            if (!in_array($role, ['student', 'driver', 'admin'])) {
+                $rowErrors[] = "role \"{$role}\" is invalid — must be student, driver, or admin";
+            }
+
+            if (!empty($rowErrors)) {
+                $errors[] = "Row {$rowNum} ({$email}): " . implode('; ', $rowErrors);
+                continue;
+            }
+
+            User::create([
+                'name'      => $name,
+                'email'     => $email,
+                'password'  => Hash::make($password),
+                'role'      => $role,
+                'is_active' => true,
+            ]);
+
+            $created++;
+        }
+
+        fclose($handle);
+
+        return response()->json([
+            'status'  => 'ok',
+            'created' => $created,
+            'errors'  => $errors,
+        ]);
+    }
+
 }

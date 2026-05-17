@@ -60,6 +60,7 @@
         <div style="display:flex;gap:8px;align-items:center;">
           <input id="userSearch" class="admin-search" placeholder="Search name or email…">
           <button class="admin-btn-primary" id="addUserBtn">+ Add user</button>
+          <button class="admin-btn-sm" id="importUsersBtn">⬆ Import CSV</button>
         </div>
       </div>
       <div id="usersTable"></div>
