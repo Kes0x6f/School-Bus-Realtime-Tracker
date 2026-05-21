@@ -154,6 +154,18 @@
             </div>
         </div>
 
+        <!-- Distance from user to the jeep -->
+        <div class="info-row">
+            <span class="info-label">Distance</span>
+            <span id="infoDistance">Locating…</span>
+        </div>
+
+        <!-- General direction toward the jeep -->
+        <div class="info-row">
+            <span class="info-label">Direction</span>
+            <span id="infoDirection">—</span>
+        </div>
+
     </div>
 
     <!-- BACK BUTTON -->

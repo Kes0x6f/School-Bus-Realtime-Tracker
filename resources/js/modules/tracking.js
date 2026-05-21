@@ -14,6 +14,10 @@
  * 6. Runs a staleness checker every 30 s that switches the UI to "disconnected"
  *    if no update has arrived for 3+ minutes — giving students immediate feedback
  *    before the server-side cron even fires.
+ * 7. [NEW] Watches the student's own device location and shows:
+ *    - A blue "You are here" marker on the map
+ *    - A dashed line from the student to the jeep
+ *    - Distance (metres or kilometres) and general compass direction in the info panel
  *
  * Status flow
  * ───────────
@@ -22,42 +26,55 @@
  *   disconnected→ show no-signal banner       | toast: "GPS signal lost"
  *   shift_ended → show full-screen overlay    | (no toast — overlay is prominent enough)
  */
-const GPS_STALE_MS     = 3 * 60 * 1000; // 3 minutes — mirrors backend threshold
-const STALE_CHECK_MS   = 30 * 1000;     // check every 30s
+const GPS_STALE_MS   = 3 * 60 * 1000; // 3 minutes — mirrors backend threshold
+const STALE_CHECK_MS = 30 * 1000;     // check every 30s
 
-//States
+// ─── State ────────────────────────────────────────────────────────────────────
+
 let map;
-let jeepMarker        = null;
-let channel           = null;
-let staleCheckInterval = null;
+let jeepMarker         = null;
+let userMarker         = null;   // [NEW] "You are here" marker
+let proximityLine      = null;   // [NEW] dashed polyline between user and jeep
+let channel            = null;
+let staleCheckInterval    = null;
 let lastSeenTickerInterval = null;
- 
-let lastTimestamp    = 0;       // most recent whisper timestamp (ms)
-let lastWhisperTime  = 0;       // wall-clock time of last received update
-let lastSeenISO      = null;    // ISO string for the last-seen ticker
-let previousGpsStatus = null;   // track previous status to fire toasts only on change
+
+let lastTimestamp     = 0;       // most recent whisper timestamp (ms)
+let lastWhisperTime   = 0;       // wall-clock time of last received update
+let lastSeenISO       = null;    // ISO string for the last-seen ticker
+let previousGpsStatus = null;    // track previous status to fire toasts only on change
+
+let jeepLatLng  = null;          // [NEW] { lat, lng } — updated every time jeep moves
+let userLatLng  = null;          // [NEW] { lat, lng } — updated by watchPosition
+let userWatchId = null;          // [NEW] geolocation watch handle
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
 
 export function initTracking() {
-     const container = document.getElementById("app");
-     if (!container || typeof L === 'undefined') {
-         console.error('Tracking: missing #app or Leaflet');
-         return;
-     }
+    const container = document.getElementById("app");
+    if (!container || typeof L === 'undefined') {
+        console.error('Tracking: missing #app or Leaflet');
+        return;
+    }
 
-    const vehicleId      = container.dataset.vehicleId;
+    const vehicleId       = container.dataset.vehicleId;
     const expectedDriverId = parseInt(container.dataset.driverId);
 
     seedInfoPanel(container);
- 
+
     initMap();
     loadInitialVehicle(vehicleId, container);
     initRealtime(vehicleId, expectedDriverId);
     startStalenessChecker();
     startLastSeenTicker();
     bindShiftEndedDismiss();
+
+    // [NEW] Start watching the student's own GPS position.
+    // Done last so the map is already initialised before we try to add markers.
+    initUserLocation();
 }
 
-// ─── Map init ────────────────────────────────────────────────────────────────
+// ─── Map init ─────────────────────────────────────────────────────────────────
 
 function initMap() {
     map = L.map('map');
@@ -71,31 +88,36 @@ function initMap() {
 }
 
 // ─── Initial load ─────────────────────────────────────────────────────────────
- 
+
 /**
  * Seed the info panel from the data-* attributes the Blade template already
  * rendered. This avoids a visible "flash" of empty/dashed fields before the
  * first API response comes back.
  */
 function seedInfoPanel(app) {
-    setInfoField('infoRoute',     app.dataset.route     || 'N/A');
-    setInfoField('infoDriver',    app.dataset.driverName || 'Unknown');
+    setInfoField('infoRoute',     app.dataset.route      || 'N/A');
+    setInfoField('infoDriver',    app.dataset.driverName  || 'Unknown');
     setInfoField('infoSpeed',     formatSpeed(parseFloat(app.dataset.speed || 0)));
- 
+
     const shiftStarted = app.dataset.shiftStarted;
     setInfoField('infoShiftStart', shiftStarted ? formatTime(shiftStarted) : '--');
- 
+
     lastSeenISO = app.dataset.lastSeen || null;
     if (lastSeenISO) {
         lastWhisperTime = new Date(lastSeenISO).getTime();
     }
- 
+
     updateCapacityBadge(app.dataset.isFull === '1');
- 
+
+    // [NEW] Show placeholder text in proximity fields until both positions are known
+    setInfoField('infoDistance',  'Locating…');
+    setInfoField('infoDirection', '—');
+
     // Apply initial GPS status (without showing a toast — page just loaded)
     const initialStatus = app.dataset.gpsStatus || 'disconnected';
     applyGpsStatus(initialStatus, lastSeenISO, /* silent = */ true);
 }
+
 function loadInitialVehicle(vehicleId, app) {
     fetch(`/api/vehicles/${vehicleId}`)
         .then(res => res.json())
@@ -110,22 +132,31 @@ function loadInitialVehicle(vehicleId, app) {
 
             if (vehicle.latitude && vehicle.longitude) {
                 placeMarker(vehicle.latitude, vehicle.longitude);
+                // [NEW] Store jeep position so proximity can be computed as soon
+                // as the user's own GPS fix comes in.
+                jeepLatLng = { lat: vehicle.latitude, lng: vehicle.longitude };
             }
-             // Refresh panel with fresher API data (in case Blade data was stale)
-            setInfoField('infoRoute',  vehicle.route_name || 'N/A');
-            setInfoField('infoSpeed',  formatSpeed(vehicle.speed));
- 
+
+            // Refresh panel with fresher API data (in case Blade data was stale)
+            setInfoField('infoRoute', vehicle.route_name || 'N/A');
+            setInfoField('infoSpeed', formatSpeed(vehicle.speed));
+
             lastSeenISO = vehicle.last_seen || null;
             if (lastSeenISO) {
                 lastWhisperTime = new Date(lastSeenISO).getTime();
             }
+
             // Reflect whatever state the vehicle is already in
             applyGpsStatus(vehicle.gps_status, vehicle.last_seen, /* silent= */ true);
+
+            // [NEW] If watchPosition already returned a user fix before the API
+            // responded, compute proximity now that we have the jeep position.
+            updateProximityInfo();
         })
         .catch(err => console.error("Failed to load vehicle:", err));
 }
 
-// ─── Realtime ────────────────────────────────────────────────────────────────
+// ─── Realtime ─────────────────────────────────────────────────────────────────
 
 function initRealtime(vehicleId, expectedDriverId) {
     channel = Echo.private(`vehicle.${vehicleId}`);
@@ -186,7 +217,7 @@ function initRealtime(vehicleId, expectedDriverId) {
         if (vehicle.route_name) {
             const currentRoute = document.getElementById('infoRoute')?.textContent?.trim();
             const newRoute     = vehicle.route_name.trim();
- 
+
             if (currentRoute && newRoute && currentRoute !== newRoute && currentRoute !== 'N/A') {
                 showToast(
                     `🚌 Route changed to ${newRoute}`,
@@ -194,37 +225,251 @@ function initRealtime(vehicleId, expectedDriverId) {
                     8000   // longer duration — students should have time to read it
                 );
             }
- 
+
             setInfoField('infoRoute', newRoute);
         }
 
         // Update panel fields that status-change events carry
         if (vehicle.is_full !== undefined) updateCapacityBadge(vehicle.is_full);
- 
+
         lastSeenISO = vehicle.last_seen || lastSeenISO;
 
         applyGpsStatus(vehicle.gps_status, vehicle.last_seen);
     });
 }
 
-// ─── Location received ───────────────────────────────────────────────────────
+// ─── Location received ────────────────────────────────────────────────────────
 
 function onLocationReceived({ lat, lng, speed, gpsStatus, lastSeen, isFull, route }) {
-   lastWhisperTime = Date.now();
- 
+    lastWhisperTime = Date.now();
+
     if (lastSeen) lastSeenISO = lastSeen;
     else          lastSeenISO = new Date(lastWhisperTime).toISOString();
- 
+
     updateMarker(lat, lng);
+
+    // [NEW] Keep jeepLatLng current so updateProximityInfo always has fresh data
+    jeepLatLng = { lat, lng };
+    updateProximityInfo();
+
     setInfoField('infoSpeed', formatSpeed(speed));
-    if (route !== undefined)   setInfoField('infoRoute', route || 'N/A');
-    if (isFull !== undefined)  updateCapacityBadge(isFull);
- 
+    if (route !== undefined)  setInfoField('infoRoute', route || 'N/A');
+    if (isFull !== undefined) updateCapacityBadge(isFull);
+
     applyGpsStatus(gpsStatus, lastSeenISO);
 }
 
+// ─── [NEW] User location ──────────────────────────────────────────────────────
+
+/**
+ * Requests the browser's geolocation and watches for changes.
+ *
+ * - Places a custom blue "You are here" marker.
+ * - Draws a dashed polyline from the student to the jeep.
+ * - Calls updateProximityInfo() after each fix so distance + direction stay fresh.
+ *
+ * If the browser refuses permission or doesn't support geolocation, the
+ * proximity fields quietly show "Location unavailable" and no marker appears.
+ * Everything else on the page continues to work normally.
+ */
+function initUserLocation() {
+    if (!navigator.geolocation) {
+        setInfoField('infoDistance',  'Not supported');
+        setInfoField('infoDirection', '—');
+        return;
+    }
+
+    const options = {
+        enableHighAccuracy: true,
+        maximumAge:         10000,   // accept a cached fix up to 10 s old
+        timeout:            15000,
+    };
+
+    userWatchId = navigator.geolocation.watchPosition(
+        (position) => {
+            const { latitude: lat, longitude: lng } = position.coords;
+            userLatLng = { lat, lng };
+            placeUserMarker(lat, lng);
+            updateProximityInfo();
+        },
+        (err) => {
+            console.warn('User geolocation error:', err.message);
+            setInfoField('infoDistance',  'Location unavailable');
+            setInfoField('infoDirection', '—');
+        },
+        options
+    );
+}
+
+/**
+ * Place or move the "You are here" marker (blue pulsing dot).
+ * The icon is a simple CSS div — no image assets required.
+ */
+function placeUserMarker(lat, lng) {
+    if (!map) return;
+
+    if (!userMarker) {
+        const icon = L.divIcon({
+            className: '',
+            html: `
+                <div style="
+                    position: relative;
+                    width: 18px; height: 18px;
+                ">
+                    <!-- Outer pulse ring -->
+                    <div style="
+                        position: absolute; inset: -6px;
+                        border-radius: 50%;
+                        background: rgba(30,136,229,0.20);
+                        animation: userPulse 2s ease-out infinite;
+                    "></div>
+                    <!-- Inner solid dot -->
+                    <div style="
+                        width: 18px; height: 18px;
+                        border-radius: 50%;
+                        background: #1E88E5;
+                        border: 2.5px solid #fff;
+                        box-shadow: 0 1px 6px rgba(0,0,0,0.4);
+                    "></div>
+                </div>
+                <style>
+                    @keyframes userPulse {
+                        0%   { transform: scale(0.6); opacity: 0.8; }
+                        70%  { transform: scale(2.2); opacity: 0;   }
+                        100% { transform: scale(2.2); opacity: 0;   }
+                    }
+                </style>
+            `,
+            iconSize:   [18, 18],
+            iconAnchor: [9, 9],
+        });
+
+        userMarker = L.marker([lat, lng], { icon, zIndexOffset: 500 })
+            .bindTooltip('You are here', { permanent: false, direction: 'top', offset: [0, -12] })
+            .addTo(map);
+    } else {
+        userMarker.setLatLng([lat, lng]);
+    }
+
+    drawProximityLine();
+}
+
+/**
+ * Draw (or redraw) the dashed polyline connecting the student to the jeep.
+ * Only drawn when both positions are known.
+ */
+function drawProximityLine() {
+    if (!map || !userLatLng || !jeepLatLng) return;
+
+    const points = [
+        [userLatLng.lat, userLatLng.lng],
+        [jeepLatLng.lat, jeepLatLng.lng],
+    ];
+
+    if (proximityLine) {
+        proximityLine.setLatLngs(points);
+    } else {
+        proximityLine = L.polyline(points, {
+            color:     '#1E88E5',
+            weight:    2,
+            opacity:   0.55,
+            dashArray: '6 8',   // dashed — clearly not a road
+        }).addTo(map);
+    }
+}
+
+// ─── [NEW] Proximity calculation ──────────────────────────────────────────────
+
+/**
+ * Recalculate and render distance + direction whenever either position changes.
+ * Safe to call with incomplete state — returns early if either position is null.
+ */
+function updateProximityInfo() {
+    if (!userLatLng || !jeepLatLng) return;
+
+    const distM   = haversineDistance(userLatLng.lat, userLatLng.lng, jeepLatLng.lat, jeepLatLng.lng);
+    const bearing = getBearing(userLatLng.lat, userLatLng.lng, jeepLatLng.lat, jeepLatLng.lng);
+    const { label: cardinalLabel, arrow } = bearingToCardinal(bearing);
+
+    setInfoField('infoDistance',  formatDistance(distM));
+    setInfoField('infoDirection', `${arrow} ${cardinalLabel}`);
+
+    // Redraw the line in case the jeep moved
+    drawProximityLine();
+}
+
+/**
+ * Haversine formula — returns distance in metres between two lat/lng points.
+ */
+function haversineDistance(lat1, lng1, lat2, lng2) {
+    const R    = 6371000; // Earth's radius in metres
+    const toRad = deg => (deg * Math.PI) / 180;
+
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Returns the forward azimuth (bearing) in degrees [0, 360) from point 1 to point 2.
+ * 0° = North, 90° = East, 180° = South, 270° = West.
+ */
+function getBearing(lat1, lng1, lat2, lng2) {
+    const toRad = deg => (deg * Math.PI) / 180;
+    const toDeg = rad => (rad * 180) / Math.PI;
+
+    const dLng = toRad(lng2 - lng1);
+    const lat1R = toRad(lat1);
+    const lat2R = toRad(lat2);
+
+    const x = Math.sin(dLng) * Math.cos(lat2R);
+    const y = Math.cos(lat1R) * Math.sin(lat2R) - Math.sin(lat1R) * Math.cos(lat2R) * Math.cos(dLng);
+
+    return (toDeg(Math.atan2(x, y)) + 360) % 360;
+}
+
+/**
+ * Maps a bearing (0–360°) to one of 8 cardinal / intercardinal labels + arrow emoji.
+ *
+ * Sectors are 45° wide, centred on each direction:
+ *   North     : 337.5° – 22.5°
+ *   Northeast : 22.5°  – 67.5°
+ *   … and so on
+ */
+function bearingToCardinal(bearing) {
+    const directions = [
+        { label: 'North',     arrow: '↑' },
+        { label: 'Northeast', arrow: '↗' },
+        { label: 'East',      arrow: '→' },
+        { label: 'Southeast', arrow: '↘' },
+        { label: 'South',     arrow: '↓' },
+        { label: 'Southwest', arrow: '↙' },
+        { label: 'West',      arrow: '←' },
+        { label: 'Northwest', arrow: '↖' },
+    ];
+
+    // Each sector is 45°; offset by 22.5° so North is centred on 0°
+    const index = Math.round(bearing / 45) % 8;
+    return directions[index];
+}
+
+/**
+ * Format metres into a human-readable string.
+ *   < 1 000 m → "350 m"
+ *   ≥ 1 000 m → "1.2 km"
+ */
+function formatDistance(metres) {
+    if (metres < 1000) return `${Math.round(metres)} m`;
+    return `${(metres / 1000).toFixed(1)} km`;
+}
+
 // ─── GPS status → UI ──────────────────────────────────────────────────────────
- 
+
 /**
  * Apply the correct UI for a given gps_status.
  * Toasts fire only when the status *changes* (not on every update ping).
@@ -237,7 +482,7 @@ function onLocationReceived({ lat, lng, speed, gpsStatus, lastSeen, isFull, rout
  */
 function applyGpsStatus(gpsStatus, lastSeen, silent = false) {
     const changed = gpsStatus !== previousGpsStatus;
- 
+
     switch (gpsStatus) {
         case 'moving':
             hideBanner('noSignalBanner');
@@ -247,7 +492,7 @@ function applyGpsStatus(gpsStatus, lastSeen, silent = false) {
                 showToast('● GPS signal restored — vehicle is moving', 'success');
             }
             break;
- 
+
         case 'idle':
             hideBanner('noSignalBanner');
             showBanner('idleBanner', '🚌 Vehicle is currently stopped or idling');
@@ -256,7 +501,7 @@ function applyGpsStatus(gpsStatus, lastSeen, silent = false) {
                 showToast('Vehicle has stopped — waiting for passengers', 'info');
             }
             break;
- 
+
         case 'disconnected': {
             hideBanner('idleBanner');
             const ago = lastSeen ? formatTimeAgo(lastSeen) : 'unknown time';
@@ -267,53 +512,53 @@ function applyGpsStatus(gpsStatus, lastSeen, silent = false) {
             }
             break;
         }
- 
+
         case 'shift_ended':
             showShiftEndedOverlay();
             return; // don't update previousGpsStatus here — overlay handles it
     }
- 
+
     previousGpsStatus = gpsStatus;
 }
- 
+
 // ─── Status pill (floating on map) ────────────────────────────────────────────
- 
+
 const PILL_CONFIG = {
-    moving:      { dot: '#43A047', text: '● LIVE',      bg: 'rgba(0,0,0,0.65)' },
-    idle:        { dot: '#FBC02D', text: '● IDLE',      bg: 'rgba(0,0,0,0.65)' },
-    disconnected:{ dot: '#E64A19', text: '◌ NO SIGNAL', bg: 'rgba(0,0,0,0.65)' },
-    shift_ended: { dot: '#9E9E9E', text: '■ ENDED',     bg: 'rgba(0,0,0,0.65)' },
+    moving:       { dot: '#43A047', text: '● LIVE',      bg: 'rgba(0,0,0,0.65)' },
+    idle:         { dot: '#FBC02D', text: '● IDLE',      bg: 'rgba(0,0,0,0.65)' },
+    disconnected: { dot: '#E64A19', text: '◌ NO SIGNAL', bg: 'rgba(0,0,0,0.65)' },
+    shift_ended:  { dot: '#9E9E9E', text: '■ ENDED',     bg: 'rgba(0,0,0,0.65)' },
 };
- 
+
 function setStatusPill(gpsStatus) {
-    const pill    = document.getElementById('statusPill');
-    const dot     = document.getElementById('statusPillDot');
-    const textEl  = document.getElementById('statusPillText');
+    const pill   = document.getElementById('statusPill');
+    const dot    = document.getElementById('statusPillDot');
+    const textEl = document.getElementById('statusPillText');
     if (!pill || !dot || !textEl) return;
- 
+
     const cfg = PILL_CONFIG[gpsStatus] || PILL_CONFIG.disconnected;
-    dot.style.background    = cfg.dot;
-    textEl.textContent      = cfg.text;
-    pill.style.background   = cfg.bg;
+    dot.style.background  = cfg.dot;
+    textEl.textContent    = cfg.text;
+    pill.style.background = cfg.bg;
 }
- 
+
 // ─── Banners ──────────────────────────────────────────────────────────────────
- 
+
 function showBanner(id, message) {
     const el = document.getElementById(id);
     if (!el) return;
     el.textContent = message;
     el.classList.remove('hidden');
 }
- 
+
 function hideBanner(id) {
     const el = document.getElementById(id);
     if (!el) return;
     el.classList.add('hidden');
 }
- 
+
 // ─── Toast notifications ──────────────────────────────────────────────────────
- 
+
 /**
  * showToast(message, type, duration)
  *
@@ -323,46 +568,48 @@ function hideBanner(id) {
 function showToast(message, type = 'info', duration = 4500) {
     const stack = document.getElementById('toastStack');
     if (!stack) return;
- 
+
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.innerHTML = `
         <span class="toast-msg">${message}</span>
         <button class="toast-close" aria-label="Dismiss">✕</button>
     `;
- 
+
     toast.querySelector('.toast-close').addEventListener('click', () => dismissToast(toast));
     stack.appendChild(toast);
- 
-    // Animate in
+
     requestAnimationFrame(() => toast.classList.add('toast-visible'));
- 
-    // Auto-dismiss
+
     setTimeout(() => dismissToast(toast), duration);
 }
- 
+
 function dismissToast(toast) {
     toast.classList.remove('toast-visible');
     toast.classList.add('toast-exit');
     setTimeout(() => toast.remove(), 350);
 }
- 
+
 // ─── Shift-ended overlay ──────────────────────────────────────────────────────
- 
+
 function showShiftEndedOverlay() {
     clearInterval(staleCheckInterval);
     clearInterval(lastSeenTickerInterval);
- 
+
+    // [NEW] Stop watching user location — no more jeep to track
+    if (userWatchId !== null) {
+        navigator.geolocation.clearWatch(userWatchId);
+        userWatchId = null;
+    }
+
     hideBanner('noSignalBanner');
     hideBanner('idleBanner');
     setStatusPill('shift_ended');
- 
+
     const overlay = document.getElementById('shiftEndedOverlay');
-    if (overlay) {
-        overlay.classList.remove('hidden');
-    }
+    if (overlay) overlay.classList.remove('hidden');
 }
- 
+
 /** "Stay on this page" button — dismisses the modal so students can see the last map position */
 function bindShiftEndedDismiss() {
     const btn = document.getElementById('shiftEndedDismiss');
@@ -372,23 +619,23 @@ function bindShiftEndedDismiss() {
         showToast('Shift has ended — map shows last known position', 'warning', 8000);
     });
 }
- 
+
 // ─── Info panel helpers ───────────────────────────────────────────────────────
- 
+
 function setInfoField(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
 }
- 
+
 function updateCapacityBadge(isFull) {
     const badge = document.getElementById('infoCapacityBadge');
     if (!badge) return;
     badge.textContent = isFull ? 'FULL' : 'SEATS AVAILABLE';
     badge.className   = `capacity-badge ${isFull ? 'cap-full' : 'cap-available'}`;
 }
- 
+
 // ─── Staleness checker ────────────────────────────────────────────────────────
- 
+
 /**
  * Runs every 30 s. If no update has arrived for GPS_STALE_MS (3 min),
  * proactively switch to "disconnected" — giving students immediate feedback
@@ -397,7 +644,7 @@ function updateCapacityBadge(isFull) {
 function startStalenessChecker() {
     staleCheckInterval = setInterval(() => {
         if (lastWhisperTime === 0) return;
- 
+
         const ms = Date.now() - lastWhisperTime;
         if (ms >= GPS_STALE_MS) {
             const iso = new Date(lastWhisperTime).toISOString();
@@ -405,9 +652,9 @@ function startStalenessChecker() {
         }
     }, STALE_CHECK_MS);
 }
- 
+
 // ─── Live last-seen ticker ────────────────────────────────────────────────────
- 
+
 /**
  * Ticks every second to keep #infoLastSeen fresh (e.g. "12s ago", "3m ago")
  * without requiring a server round-trip.
@@ -416,18 +663,18 @@ function startLastSeenTicker() {
     lastSeenTickerInterval = setInterval(() => {
         const el = document.getElementById('infoLastSeen');
         if (!el) return;
- 
+
         if (!lastSeenISO) {
             el.textContent = '--';
             return;
         }
- 
+
         el.textContent = formatTimeAgo(lastSeenISO);
     }, 1000);
 }
- 
-// ─── Marker ───────────────────────────────────────────────────────────────────
- 
+
+// ─── Jeep marker ─────────────────────────────────────────────────────────────
+
 function placeMarker(lat, lng) {
     if (jeepMarker) {
         jeepMarker.setLatLng([lat, lng]);
@@ -436,7 +683,7 @@ function placeMarker(lat, lng) {
     }
     map.setView([lat, lng], 16);
 }
- 
+
 /**
  * Smoothly animate the marker to (lat, lng) over ~250 ms (5 steps × 50 ms).
  * Falls back to placeMarker if jeepMarker hasn't been created yet.
@@ -446,12 +693,12 @@ function updateMarker(lat, lng) {
         placeMarker(lat, lng);
         return;
     }
- 
+
     const current = jeepMarker.getLatLng();
     const target  = L.latLng(lat, lng);
     const steps   = 5;
     let i = 0;
- 
+
     const interval = setInterval(() => {
         i++;
         const t      = i / steps;
@@ -460,12 +707,12 @@ function updateMarker(lat, lng) {
         jeepMarker.setLatLng([newLat, newLng]);
         if (i >= steps) clearInterval(interval);
     }, 50);
- 
+
     map.panTo([lat, lng], { animate: true, duration: 0.25 });
 }
- 
+
 // ─── Formatters ───────────────────────────────────────────────────────────────
- 
+
 function formatTimeAgo(isoString) {
     const diffSec = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
     if (diffSec < 5)    return 'Just now';
@@ -473,13 +720,13 @@ function formatTimeAgo(isoString) {
     if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
     return `${Math.floor(diffSec / 3600)}h ago`;
 }
- 
+
 function formatSpeed(speed) {
     const s = parseFloat(speed);
     if (isNaN(s)) return '-- km/h';
     return `${Math.round(s)} km/h`;
 }
- 
+
 function formatTime(isoString) {
     if (!isoString) return '--';
     return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
