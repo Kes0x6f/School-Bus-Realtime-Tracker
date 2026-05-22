@@ -154,16 +154,28 @@
             </div>
         </div>
 
-        <!-- Distance from user to the jeep -->
-        <div class="info-row">
-            <span class="info-label">Distance</span>
-            <span id="infoDistance">Locating…</span>
-        </div>
-
-        <!-- General direction toward the jeep -->
-        <div class="info-row">
-            <span class="info-label">Direction</span>
-            <span id="infoDirection">—</span>
+        <!-- Row 4: Your Location (proximity section) -->
+        {{--
+            Separated by a hairline rule so it reads as a distinct "about you"
+            section while staying visually inside the same card.
+            infoDistance and infoDirection are written to by tracking.js.
+            CSS classes live in app.css under "PROXIMITY SECTION".
+        --}}
+        <div class="proximity-section">
+            <p class="info-label proximity-header">
+                <span class="proximity-dot"></span>
+                YOUR LOCATION
+            </p>
+            <div class="info-grid-2">
+                <div class="info-col">
+                    <p class="info-label">DISTANCE</p>
+                    <p id="infoDistance" class="info-value">Locating…</p>
+                </div>
+                <div class="info-col">
+                    <p class="info-label">DIRECTION TO JEEP</p>
+                    <p id="infoDirection" class="info-value">—</p>
+                </div>
+            </div>
         </div>
 
     </div>

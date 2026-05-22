@@ -44,9 +44,10 @@ let lastWhisperTime   = 0;       // wall-clock time of last received update
 let lastSeenISO       = null;    // ISO string for the last-seen ticker
 let previousGpsStatus = null;    // track previous status to fire toasts only on change
 
-let jeepLatLng  = null;          // [NEW] { lat, lng } — updated every time jeep moves
-let userLatLng  = null;          // [NEW] { lat, lng } — updated by watchPosition
-let userWatchId = null;          // [NEW] geolocation watch handle
+let jeepLatLng       = null;     // [NEW] { lat, lng } — updated every time jeep moves
+let userLatLng       = null;     // [NEW] { lat, lng } — updated by watchPosition
+let userWatchId      = null;     // [NEW] geolocation watch handle
+let currentJeepStatus = null;   // tracks gps_status so the icon color can be updated in-place
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -131,7 +132,7 @@ function loadInitialVehicle(vehicleId, app) {
             }
 
             if (vehicle.latitude && vehicle.longitude) {
-                placeMarker(vehicle.latitude, vehicle.longitude);
+                placeMarker(vehicle.latitude, vehicle.longitude, vehicle.gps_status);
                 // [NEW] Store jeep position so proximity can be computed as soon
                 // as the user's own GPS fix comes in.
                 jeepLatLng = { lat: vehicle.latitude, lng: vehicle.longitude };
@@ -344,7 +345,7 @@ function placeUserMarker(lat, lng) {
             iconAnchor: [9, 9],
         });
 
-        userMarker = L.marker([lat, lng], { icon, zIndexOffset: 500 })
+        userMarker = L.marker([lat, lng], { icon, zIndexOffset: 100 })
             .bindTooltip('You are here', { permanent: false, direction: 'top', offset: [0, -12] })
             .addTo(map);
     } else {
@@ -482,6 +483,10 @@ function formatDistance(metres) {
  */
 function applyGpsStatus(gpsStatus, lastSeen, silent = false) {
     const changed = gpsStatus !== previousGpsStatus;
+
+    // Keep the jeep icon color in sync with current status
+    currentJeepStatus = gpsStatus;
+    updateJeepMarkerIcon(gpsStatus);
 
     switch (gpsStatus) {
         case 'moving':
@@ -675,11 +680,64 @@ function startLastSeenTicker() {
 
 // ─── Jeep marker ─────────────────────────────────────────────────────────────
 
-function placeMarker(lat, lng) {
+/**
+ * Build a status-aware divIcon for the jeep.
+ *
+ * Shape:  rounded square (clearly a vehicle, not a "you are here" dot)
+ * Colors: navy when moving, amber when idle, grey when disconnected
+ * Size:   36 × 36 px — prominent but not overbearing
+ *
+ * Keeping it distinct from the user's circular pulsing blue dot is the key
+ * goal — students should never confuse the two at a glance.
+ */
+function createJeepIcon(gpsStatus) {
+    const bgColor = gpsStatus === 'moving'       ? '#002D62'  // navy
+                  : gpsStatus === 'idle'          ? '#E65100'  // deep orange (warm, not blue)
+                  : gpsStatus === 'disconnected'  ? '#757575'  // grey
+                  : '#757575';                                  // shift_ended / unknown
+
+    return L.divIcon({
+        className: '',  // suppress Leaflet's default white square
+        html: `
+            <div style="
+                width: 36px;
+                height: 36px;
+                border-radius: 10px;
+                background: ${bgColor};
+                border: 2.5px solid #fff;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+                line-height: 1;
+                transition: background 0.3s;
+            ">🚌</div>`,
+        iconSize:    [36, 36],
+        iconAnchor:  [18, 18],
+        tooltipAnchor: [0, -20],
+    });
+}
+
+/**
+ * Swap just the icon color when GPS status changes — no position update needed.
+ * Called from applyGpsStatus so the marker reflects the current state.
+ */
+function updateJeepMarkerIcon(gpsStatus) {
+    if (!jeepMarker) return;
+    jeepMarker.setIcon(createJeepIcon(gpsStatus));
+}
+
+function placeMarker(lat, lng, gpsStatus = 'disconnected') {
     if (jeepMarker) {
         jeepMarker.setLatLng([lat, lng]);
     } else {
-        jeepMarker = L.marker([lat, lng]).addTo(map);
+        jeepMarker = L.marker([lat, lng], {
+            icon:          createJeepIcon(gpsStatus),
+            zIndexOffset:  1000,   // always above the user dot
+        })
+        .bindTooltip('Jeep', { permanent: false, direction: 'top', offset: [0, -6] })
+        .addTo(map);
     }
     map.setView([lat, lng], 16);
 }
@@ -690,7 +748,7 @@ function placeMarker(lat, lng) {
  */
 function updateMarker(lat, lng) {
     if (!jeepMarker) {
-        placeMarker(lat, lng);
+        placeMarker(lat, lng, currentJeepStatus ?? 'disconnected');
         return;
     }
 

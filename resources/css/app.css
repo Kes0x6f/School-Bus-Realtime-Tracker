@@ -2,17 +2,124 @@
   @tailwind components;
   @tailwind utilities;
 
+/* ============================================================
+   DESIGN TOKENS — edit here to retheme the entire app
+   ============================================================ */
+:root {
+  /* Brand */
+  --c-primary:         #002D62;
+  --c-primary-hover:   #004a96;
+  --c-accent:          #B8860B;
+
+  /* Surfaces */
+  --c-bg:              #F0F2F5;
+  --c-surface:         #ffffff;
+  --c-surface-alt:     #F9FAFB;
+  --c-surface-muted:   #F3F4F6;
+
+  /* Text */
+  --c-text:            #1A1A1A;
+  --c-text-dark:       #111827;
+  --c-text-secondary:  #374151;
+  --c-text-muted:      #6B7280;
+  --c-text-faint:      #9CA3AF;
+  --c-text-label:      #666;
+
+  /* Borders */
+  --c-border:          #E5E7EB;
+  --c-border-light:    #F3F4F6;
+
+  /* Semantic */
+  --c-danger:          #dc3545;
+  --c-danger-dark:     #b71c1c;
+  --c-danger-bg:       #FEE2E2;
+  --c-success:         #28a745;
+  --c-success-dark:    #065F46;
+  --c-success-bg:      #D1FAE5;
+  --c-warning:         #ffc107;
+
+  /* GPS status */
+  --c-gps-moving:      #43A047;
+  --c-gps-idle:        #FBC02D;
+  --c-gps-stale:       #E64A19;
+
+  /* Feature: user location dot + line */
+  --c-user-location:   #1E88E5;
+
+  /* Radius scale */
+  --r-xs:   4px;
+  --r-sm:   6px;
+  --r-md:   10px;
+  --r-lg:   16px;
+  --r-xl:   20px;
+  --r-full: 9999px;
+
+  /* Elevation */
+  --shadow-xs: 0 1px 4px rgba(0,0,0,0.06);
+  --shadow-sm: 0 4px 16px rgba(0,0,0,0.08);
+  --shadow-md: 0 6px 16px rgba(0,0,0,0.10);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,0.20);
+}
+
+
+/* ============================================================
+   GLOBAL FONT + AUTH BACKGROUND FIX
+   ============================================================ */
+
+html,
+body,
+#app {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+/*
+   Login/register background support.
+   This restores the jeep background for auth-style pages that use
+   .container + .card, while dashboard pages remain controlled by
+   #app.driver-page.
+*/
+.auth-page,
+.login-page,
+.register-page,
+.container:has(.card) {
+    background-image:
+        linear-gradient(rgba(0, 45, 98, 0.35), rgba(0, 45, 98, 0.35)),
+        url('/images/jeep.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+#app.driver-page {
+    background-image: none;
+}
+
+
+
 
   * {
     box-sizing: border-box;
   }
-  html, body {
-    height: 100%;
-    margin: 0;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  }
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--c-bg);
+  overflow-x: hidden;
+}
 
-  .container {
+body {
+  overflow-y: auto;
+}
+
+.container {
     min-height: 100vh;
     width: 100%;
     padding: 16px;
@@ -67,10 +174,10 @@
     align-items: center;
 
     border-top-width: 8px;
-    border-top-color: #002D62;
+    border-top-color: var(--c-primary);
   }
   .pageLabel {
-    color: #B8860B;
+    color: var(--c-accent);
     font-size: 11px;
     font-weight: 900;
     letter-spacing: 2px;
@@ -93,12 +200,12 @@
   .logoText {
     font-size: clamp(18px, 5vw, 22px);
     font-weight: 900;
-    color: #002D62;
+    color: var(--c-primary);
     text-align: center;
   }
   .subLabel {
     font-size: clamp(14px, 4vw, 18px);
-    color: #B8860B;
+    color: var(--c-accent);
     font-weight: bold;
     margin-top: 2px;
     text-align: center;
@@ -107,7 +214,7 @@
     font-size: clamp(18px, 5vw, 24px);
     font-weight: bold;
     margin-bottom: 25px;
-    color: #1A1A1A;
+    color: var(--c-text);
   }
   .input {
     font-size: 16px;
@@ -120,7 +227,7 @@
     background-color: #FAFAFA;
   }
   .primaryButton {
-    background: linear-gradient(135deg, #002D62 0%, #004a96 50%, #002D62 100%);
+    background: linear-gradient(135deg, var(--c-primary) 0%, var(--c-primary-hover) 50%, var(--c-primary) 100%);
     width: 100%;
     padding: 14px;
     border-radius: 12px;
@@ -185,7 +292,7 @@
     cursor: pointer;
     margin: 10px 0;
     text-decoration: none;
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     padding: 10px 20px;
     border-radius: 20px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -194,10 +301,10 @@
   }
   .fullScreen {
     width: 100%;  
+    min-height: 100vh;
     padding: 20px;
     box-sizing: border-box;
-    background: #F0F2F5;
-    height: 100vh;
+    background: var(--c-bg);
     text-align: center;
     display: flex;
     flex-direction: column;
@@ -207,7 +314,7 @@
     font-size: 32px;
     font-weight: bold;
     margin-bottom: 20px;
-    color: #1A1A1A;
+    color: var(--c-text);
   }
   .jeepCard {
     background: #fff;
@@ -226,7 +333,7 @@
     font-size: 18px;
     font-weight: bold;
     margin: 0;
-    color: #1A1A1A;
+    color: var(--c-text);
   }
   .jeepDetail {
     font-size: 14px;
@@ -250,7 +357,7 @@
     font-weight: bold;
   }
   .backButton {
-    background-color: #dc3545;
+    background-color: var(--c-danger);
     color: white;
     border: none;
     padding: 10px 20px;
@@ -259,7 +366,7 @@
     margin-top: 20px;
   }
   .routeBox {
-    background: #f8f9fa;
+    background: var(--c-surface-alt);
     padding: 10px;
     border-radius: 5px;
     margin: 10px 0;
@@ -273,7 +380,7 @@
     font-size: 16px;
     font-weight: bold;
     margin: 5px 0;
-    color: #1A1A1A;
+    color: var(--c-text);
   }
   .actionButton {
     padding: 10px 20px;
@@ -284,7 +391,7 @@
     width: 100%;
   }
   .btnActive {
-    background-color: #28a745;
+    background-color: var(--c-success);
     color: white;
   }
   .btnInactive {
@@ -292,7 +399,7 @@
     color: white;
   }
   .btnFull {
-    background-color: #dc3545;
+    background-color: var(--c-danger);
     color: white;
   }
   .btnAvailable {
@@ -316,7 +423,7 @@
     color: #666;
   }
   .primaryButtonWide {
-    background-color: #002D62;
+    background-color: var(--c-primary);
     color: white;
     border: none;
     padding: 15px 30px;
@@ -390,7 +497,7 @@
     font-size: 11px;
     font-weight: 900;
     letter-spacing: 2px;
-    color: #B8860B;
+    color: var(--c-accent);
 }
 
 .dash-header-title {
@@ -442,12 +549,12 @@
 }
 
 .shift-dot.active {
-    background: #28a745;
+    background: var(--c-success);
     box-shadow: 0 0 6px rgba(40,167,69,0.6);
 }
 
 .shift-dot.ended {
-    background: #dc3545;
+    background: var(--c-danger);
 }
 
 #shiftStatusText {
@@ -463,7 +570,7 @@
 
 #startShiftBtn {
     flex: 1;
-    background: #002D62;
+    background: var(--c-primary);
     color: white;
     padding: 12px;
     border-radius: 10px;
@@ -474,12 +581,12 @@
 }
 
 #startShiftBtn:hover {
-    background: #004a96;
+    background: var(--c-primary-hover);
 }
 
 #endShiftBtn {
     flex: 1;
-    background: #dc3545;
+    background: var(--c-danger);
     color: white;
     padding: 12px;
     border-radius: 10px;
@@ -498,8 +605,8 @@
 
 /* ===== BROADCAST ===== */
 #broadcastBtn {
-    background: #002D62;
-    border: 1px solid #002D62;
+    background: var(--c-primary);
+    border: 1px solid var(--c-primary);
     color: #fff;
     padding: 14px;
     border-radius: 10px;
@@ -510,7 +617,7 @@
 
 #broadcastBtn.btnActive {
     background: #d1e7dd;
-    border-color: #28a745;
+    border-color: var(--c-success);
     color: #155724;
 }
 
@@ -546,7 +653,7 @@
 }
 
 #busFullBtn.btnFull {
-    background: #dc3545;
+    background: var(--c-danger);
     color: white;
 }
 
@@ -689,7 +796,7 @@
 
 .shift-ended-btn-primary {
     display: block;
-    background: #002D62;
+    background: var(--c-primary);
     color: #fff;
     padding: 14px;
     border-radius: 12px;
@@ -700,7 +807,7 @@
 }
 
 .shift-ended-btn-primary:hover {
-    background: #004a96;
+    background: var(--c-primary-hover);
 }
 
 .shift-ended-btn-secondary {
@@ -765,7 +872,7 @@
 .toast-success  { background: #2e7d32; }
 .toast-info     { background: #1565c0; }
 .toast-warning  { background: #e65100; }
-.toast-danger   { background: #b71c1c; }
+.toast-danger   { background: var(--c-danger-dark); }
 
 .toast-msg {
     flex: 1;
@@ -869,7 +976,7 @@
     top: 0; left: 0; right: 0;
     z-index: 100;
     height: 52px;
-    background: #002D62;
+    background: var(--c-primary);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -922,7 +1029,7 @@
     top: 52px; left: 0; right: 0;
     z-index: 99;
     background: #fff;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid var(--c-border);
     display: flex;
     padding: 0 16px;
     gap: 4px;
@@ -937,7 +1044,7 @@
     padding: 12px 14px;
     font-size: 13px;
     font-weight: 600;
-    color: #6B7280;
+    color: var(--c-text-muted);
     cursor: pointer;
     white-space: nowrap;
     transition: color 0.2s, border-color 0.2s;
@@ -945,12 +1052,12 @@
 }
 
 .admin-tab:hover {
-    color: #002D62;
+    color: var(--c-primary);
 }
 
 .admin-tab.active {
-    color: #002D62;
-    border-bottom-color: #002D62;
+    color: var(--c-primary);
+    border-bottom-color: var(--c-primary);
 }
 
 /* ─── Body / panels ──────────────────────────────────────────── */
@@ -958,7 +1065,7 @@
     margin-top: 104px; /* topbar 52 + tabs ~52 */
     padding: 20px;
     min-height: calc(100vh - 104px);
-    background: #F3F4F6;
+    background: var(--c-border-light);
 }
 
 .admin-panel {
@@ -995,14 +1102,14 @@
 .admin-stat-num {
     font-size: 28px;
     font-weight: 700;
-    color: #002D62;
+    color: var(--c-primary);
     line-height: 1;
 }
 
 .admin-stat-lbl {
     font-size: 11px;
     font-weight: 600;
-    color: #9CA3AF;
+    color: var(--c-text-faint);
     letter-spacing: 0.5px;
     text-transform: uppercase;
 }
@@ -1048,7 +1155,7 @@
     font-weight: 700;
     letter-spacing: 1px;
     text-transform: uppercase;
-    color: #9CA3AF;
+    color: var(--c-text-faint);
     margin: 0 0 8px;
 }
 
@@ -1063,18 +1170,18 @@
 }
 
 .sidebar-vrow:hover {
-    background: #F3F4F6;
+    background: var(--c-border-light);
 }
 
 .sidebar-vname {
     font-size: 13px;
     font-weight: 600;
-    color: #111827;
+    color: var(--c-text-dark);
 }
 
 .sidebar-vsub {
     font-size: 11px;
-    color: #9CA3AF;
+    color: var(--c-text-faint);
     margin-top: 2px;
 }
 
@@ -1095,9 +1202,9 @@
 }
 
 .admin-chip {
-    background: #F3F4F6;
-    border: 1px solid #E5E7EB;
-    color: #374151;
+    background: var(--c-border-light);
+    border: 1px solid var(--c-border);
+    color: var(--c-text-secondary);
     font-size: 12px;
     font-weight: 600;
     padding: 5px 12px;
@@ -1108,22 +1215,22 @@
 }
 
 .admin-chip:hover {
-    background: #E5E7EB;
+    background: var(--c-border);
 }
 
 .admin-chip.active {
-    background: #002D62;
-    border-color: #002D62;
+    background: var(--c-primary);
+    border-color: var(--c-primary);
     color: #fff;
 }
 
 .admin-search {
     padding: 7px 12px;
-    border: 1px solid #E5E7EB;
+    border: 1px solid var(--c-border);
     border-radius: 8px;
     font-size: 13px;
     font-family: inherit;
-    color: #111827;
+    color: var(--c-text-dark);
     background: #fff;
     min-width: 200px;
     outline: none;
@@ -1131,18 +1238,18 @@
 }
 
 .admin-search:focus {
-    border-color: #002D62;
+    border-color: var(--c-primary);
 }
 
 .admin-section-title {
     font-size: 15px;
     font-weight: 700;
-    color: #111827;
+    color: var(--c-text-dark);
 }
 
 /* ─── Buttons ────────────────────────────────────────────────── */
 .admin-btn-primary {
-    background: #002D62;
+    background: var(--c-primary);
     color: #fff;
     border: none;
     padding: 8px 16px;
@@ -1156,13 +1263,13 @@
 }
 
 .admin-btn-primary:hover {
-    background: #004a96;
+    background: var(--c-primary-hover);
 }
 
 .admin-btn-sm {
-    background: #F3F4F6;
-    border: 1px solid #E5E7EB;
-    color: #374151;
+    background: var(--c-border-light);
+    border: 1px solid var(--c-border);
+    color: var(--c-text-secondary);
     font-size: 12px;
     font-weight: 600;
     padding: 5px 10px;
@@ -1173,17 +1280,17 @@
 }
 
 .admin-btn-sm:hover {
-    background: #E5E7EB;
+    background: var(--c-border);
 }
 
 .admin-btn-sm.danger {
-    color: #DC2626;
+    color: var(--c-danger);
     border-color: #FECACA;
     background: #FEF2F2;
 }
 
 .admin-btn-sm.danger:hover {
-    background: #FEE2E2;
+    background: var(--c-danger-bg);
 }
 
 /* ─── Table ──────────────────────────────────────────────────── */
@@ -1198,8 +1305,8 @@
 }
 
 .admin-table thead tr {
-    background: #F9FAFB;
-    border-bottom: 1px solid #E5E7EB;
+    background: var(--c-surface-alt);
+    border-bottom: 1px solid var(--c-border);
 }
 
 .admin-table th {
@@ -1207,7 +1314,7 @@
     text-align: left;
     font-size: 11px;
     font-weight: 700;
-    color: #6B7280;
+    color: var(--c-text-muted);
     letter-spacing: 0.5px;
     text-transform: uppercase;
     white-space: nowrap;
@@ -1215,8 +1322,8 @@
 
 .admin-table td {
     padding: 11px 14px;
-    border-bottom: 1px solid #F3F4F6;
-    color: #111827;
+    border-bottom: 1px solid var(--c-border-light);
+    color: var(--c-text-dark);
     vertical-align: middle;
 }
 
@@ -1225,7 +1332,7 @@
 }
 
 .admin-table tr:hover td {
-    background: #F9FAFB;
+    background: var(--c-surface-alt);
 }
 
 .admin-avatar {
@@ -1251,7 +1358,7 @@
 .action-link {
     font-size: 12px;
     font-weight: 600;
-    color: #002D62;
+    color: var(--c-primary);
     cursor: pointer;
     text-decoration: underline;
     text-underline-offset: 2px;
@@ -1259,15 +1366,15 @@
 }
 
 .action-link:hover {
-    color: #004a96;
+    color: var(--c-primary-hover);
 }
 
 .action-link.danger {
-    color: #DC2626;
+    color: var(--c-danger);
 }
 
 .action-link.danger:hover {
-    color: #B91C1C;
+    color: var(--c-danger-dark);
 }
 
 .action-link.success {
@@ -1285,17 +1392,17 @@
 }
 
 .badge.b-green {
-    background: #D1FAE5;
-    color: #065F46;
+    background: var(--c-success-bg);
+    color: var(--c-success-dark);
 }
 
 .badge.b-red {
-    background: #FEE2E2;
+    background: var(--c-danger-bg);
     color: #991B1B;
 }
 
 .muted {
-    color: #9CA3AF;
+    color: var(--c-text-faint);
 }
 
 /* ─── Vehicle cards ──────────────────────────────────────────── */
@@ -1330,7 +1437,7 @@
 .admin-plate {
     font-size: 16px;
     font-weight: 700;
-    color: #111827;
+    color: var(--c-text-dark);
     letter-spacing: 0.5px;
 }
 
@@ -1345,14 +1452,14 @@
     font-weight: 700;
     letter-spacing: 0.8px;
     text-transform: uppercase;
-    color: #9CA3AF;
+    color: var(--c-text-faint);
     margin-bottom: 2px;
 }
 
 .vfield-val {
     font-size: 13px;
     font-weight: 500;
-    color: #111827;
+    color: var(--c-text-dark);
 }
 
 .admin-vcard-actions {
@@ -1360,7 +1467,7 @@
     gap: 6px;
     flex-wrap: wrap;
     padding-top: 4px;
-    border-top: 1px solid #F3F4F6;
+    border-top: 1px solid var(--c-border-light);
 }
 
 /* ─── Analytics ──────────────────────────────────────────────── */
@@ -1385,7 +1492,7 @@
 .analytics-card-title {
     font-size: 13px;
     font-weight: 700;
-    color: #374151;
+    color: var(--c-text-secondary);
     margin-bottom: 16px;
 }
 
@@ -1406,7 +1513,7 @@
 
 .bar {
     width: 100%;
-    background: #002D62;
+    background: var(--c-primary);
     border-radius: 4px 4px 0 0;
     min-height: 0;
     transition: height 0.4s ease;
@@ -1415,13 +1522,13 @@
 .bar-val {
     font-size: 10px;
     font-weight: 600;
-    color: #374151;
+    color: var(--c-text-secondary);
     min-height: 14px;
 }
 
 .bar-lbl {
     font-size: 10px;
-    color: #9CA3AF;
+    color: var(--c-text-faint);
     font-weight: 500;
 }
 
@@ -1439,7 +1546,7 @@
     align-items: center;
     gap: 8px;
     font-size: 12px;
-    color: #374151;
+    color: var(--c-text-secondary);
     margin-bottom: 6px;
 }
 
@@ -1488,7 +1595,7 @@
 .modal-title {
     font-size: 17px;
     font-weight: 700;
-    color: #111827;
+    color: var(--c-text-dark);
     margin: 0;
 }
 
@@ -1496,7 +1603,7 @@
     background: none;
     border: none;
     font-size: 18px;
-    color: #9CA3AF;
+    color: var(--c-text-faint);
     cursor: pointer;
     padding: 2px 6px;
     border-radius: 4px;
@@ -1506,7 +1613,7 @@
 }
 
 .modal-close:hover {
-    color: #374151;
+    color: var(--c-text-secondary);
 }
 
 .modal-form {
@@ -1518,7 +1625,7 @@
 .modal-label {
     font-size: 12px;
     font-weight: 600;
-    color: #374151;
+    color: var(--c-text-secondary);
     letter-spacing: 0.3px;
     margin-bottom: -6px;
 }
@@ -1529,7 +1636,7 @@
     border-radius: 8px;
     font-size: 14px;
     font-family: inherit;
-    color: #111827;
+    color: var(--c-text-dark);
     background: #fff;
     outline: none;
     transition: border-color 0.2s;
@@ -1537,7 +1644,7 @@
 }
 
 .modal-input:focus {
-    border-color: #002D62;
+    border-color: var(--c-primary);
 }
 
 /* ============================================================
@@ -1636,3 +1743,518 @@
     border: 1px solid #FDBA74;
     border-radius: 10px;
 }
+/* ============================================================
+   PROXIMITY SECTION — "Your Location" block on tracking page
+   ============================================================ */
+
+/* Two-column variant of .info-grid (used for distance + direction) */
+.info-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Wrapper: hairline rule separates it from the vehicle stats above */
+.proximity-section {
+  border-top: 1px solid var(--c-border-light);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+/* Section label row — contains the coloured dot + "YOUR LOCATION" text */
+.proximity-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+/* Small filled circle that echoes the "You are here" map marker */
+.proximity-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--c-user-location);
+  flex-shrink: 0;
+}
+
+
+/* ============================================================
+   DRIVER DASHBOARD — INLINE FEEDBACK & STICKY STRIP
+   Integrated with the existing design system (--c-* vars,
+   matching border-radius scale, font sizes, and shadow levels)
+   ============================================================ */
+
+/* ── 1. Sticky status strip ──────────────────────────────────
+   Sits below the two fixed top bars (white 48px + navy 48px = 96px).
+   Mirrors the same frosted-glass style as the existing topbar.
+   Shows: plate · animated dot · live GPS status text.           */
+
+.sticky-strip {
+    position: sticky;
+    top: 96px;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 20px;
+    background: rgba(255, 255, 255, 0.93);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--c-border);
+    box-shadow: var(--shadow-xs);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.strip-plate {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--c-primary);
+    letter-spacing: 0.06em;
+    background: var(--c-surface-muted);
+    padding: 3px 8px;
+    border-radius: var(--r-xs);
+}
+
+.strip-sep {
+    color: var(--c-border);
+    font-weight: 300;
+    font-size: 16px;
+}
+
+.strip-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: var(--r-full);
+    flex-shrink: 0;
+    transition: background 0.4s;
+}
+
+.strip-dot-active {
+    background: var(--c-success);
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.22);
+    animation: stripDotPulse 2.2s ease-in-out infinite;
+}
+
+.strip-dot-ended {
+    background: var(--c-text-faint);
+}
+
+@keyframes stripDotPulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.22); }
+    50%       { box-shadow: 0 0 0 5px rgba(40, 167, 69, 0.07); }
+}
+
+.strip-status {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--c-text-muted);
+    letter-spacing: 0.01em;
+}
+
+
+/* ── 2. Broadcast button — "recording" ring ──────────────────
+   When GPS is broadcasting, a slow pulsing red ring appears
+   around the button — like a camera's record indicator.
+   Works with the existing .btnActive state.                    */
+
+#broadcastBtn.btn-recording {
+    position: relative;
+}
+
+#broadcastBtn.btn-recording::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 13px;          /* slightly larger than button's 10px */
+    border: 2px solid rgba(220, 53, 69, 0.50);
+    animation: recordingRing 1.7s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes recordingRing {
+    0%   { opacity: 0.85; transform: scale(1);    }
+    55%  { opacity: 0;    transform: scale(1.11); }
+    100% { opacity: 0;    transform: scale(1.11); }
+}
+
+
+/* ── 3. Shift card — border pulse on start / end ─────────────
+   A quick coloured glow confirms the action without a modal.
+   Uses existing card box-shadow so it feels native.            */
+
+.shift-card.card-pulse-success {
+    animation: cardGlowGreen 0.7s ease forwards;
+}
+
+.shift-card.card-pulse-danger {
+    animation: cardGlowRed 0.7s ease forwards;
+}
+
+@keyframes cardGlowGreen {
+    0%   { box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+    35%  { box-shadow: 0 0 0 5px rgba(40, 167, 69, 0.35), 0 6px 16px rgba(0,0,0,0.08); }
+    100% { box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+}
+
+@keyframes cardGlowRed {
+    0%   { box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+    35%  { box-shadow: 0 0 0 5px rgba(220, 53, 69, 0.35), 0 6px 16px rgba(0,0,0,0.08); }
+    100% { box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+}
+
+
+/* ── 4. Route saved — micro-label + select ring ───────────────
+   A small "✓ Route saved" text fades in below the select,
+   then fades out after 1.2 s.  Uses --c-success so it adapts
+   if the palette is ever retheamed.                            */
+
+.route-saved-hint {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--c-success);
+    letter-spacing: 0.02em;
+    margin: -4px 0 0 2px;   /* pull up tight under the select */
+    opacity: 1;
+    transition: opacity 0.4s ease;
+}
+
+.route-saved-hint.hint-fade-out {
+    opacity: 0;
+}
+
+/* Momentary success ring on the select — overrides the 1px ddd border */
+#routeSelect.input-saved {
+    border-color: var(--c-success) !important;
+    box-shadow: 0 0 0 2.5px rgba(40, 167, 69, 0.30) !important;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+
+/* ── 5. Button inline spinner ────────────────────────────────
+   Appears inside #startShiftBtn / #endShiftBtn while the
+   fetch is in-flight. Styled to match button colours.         */
+
+.btn-spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.30);
+    border-top-color: #fff;
+    border-radius: var(--r-full);
+    animation: btnSpin 0.6s linear infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+
+@keyframes btnSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* Keep buttons from jumping width when spinner replaces text */
+#startShiftBtn,
+#endShiftBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;          /* gap set by the span's margin-right */
+    min-width: 110px;
+}
+
+
+/* ── 6. Capacity button — scale bounce ───────────────────────
+   Applied via JS (bounceBusBtn) as inline style transitions,
+   but we define the base transition here so it's always smooth
+   on hover even without the bounce.                           */
+
+#busFullBtn {
+    transition: background 0.25s, color 0.25s, transform 0.12s ease;
+}
+
+#busFullBtn:active {
+    transform: scale(0.96);
+}
+
+
+/* ── 7. dash-wrap padding — clear sticky strip ───────────────
+   Adds a little breathing room so the first card doesn't sit
+   flush against the strip when the page first loads.          */
+
+.dash-wrap {
+    padding-top: 20px;   /* overrides any existing value safely */
+}
+
+/* ============================================================
+   DRIVER DASHBOARD MOBILE OVERRIDES
+   Scope: only #app.driver-page
+   Purpose:
+   - Remove the driver dashboard background image only.
+   - Preserve login/register page background behavior through .container.
+   - Align the fixed mobile header, status strip, and dashboard cards.
+   ============================================================ */
+
+#app.driver-page {
+    min-height: 100dvh;
+    background:
+        radial-gradient(circle at top right, rgba(0, 45, 98, 0.10), transparent 280px),
+        linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    padding-top: 132px;
+    padding-bottom: 32px;
+    overflow-x: hidden;
+}
+
+/* Safety rule:
+   If the old jeep background div still exists inside the driver dashboard,
+   hide only that full-screen background layer. */
+#app.driver-page > .fixed.inset-0 {
+    display: none !important;
+}
+
+/* Mobile fixed header group. 
+   Use this with:
+   <header class="driver-mobile-header">
+      <div class="driver-top-white"></div>
+      <div class="driver-top-blue"></div>
+      <div id="stickyStrip" class="sticky-strip">...</div>
+   </header>
+*/
+.driver-mobile-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
+}
+
+.driver-top-white {
+    height: 36px;
+    background: #ffffff;
+}
+
+.driver-top-blue {
+    height: 40px;
+    background: var(--c-primary);
+}
+
+/* Driver dashboard status strip */
+#app.driver-page .sticky-strip {
+    position: fixed;
+    top: 76px;
+    left: 0;
+    right: 0;
+    z-index: 101;
+    height: 48px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--c-border);
+    box-shadow: var(--shadow-xs);
+    display: flex;
+    align-items: center;
+}
+
+/* Shared horizontal alignment with dashboard cards */
+#app.driver-page .sticky-strip-inner,
+#app.driver-page .dash-wrap {
+    width: 100%;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
+/* Status strip layout */
+#app.driver-page .sticky-strip-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+}
+
+#app.driver-page .strip-plate {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--c-primary);
+    letter-spacing: 0.06em;
+    background: var(--c-surface-muted);
+    padding: 5px 9px;
+    border-radius: 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+#app.driver-page .strip-sep {
+    display: none;
+}
+
+#app.driver-page .strip-info {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+#app.driver-page .strip-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: var(--r-full);
+    flex-shrink: 0;
+}
+
+#app.driver-page .strip-dot-active {
+    background: var(--c-success);
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.22);
+    animation: stripDotPulse 2.2s ease-in-out infinite;
+}
+
+#app.driver-page .strip-dot-ended {
+    background: var(--c-text-faint);
+}
+
+#app.driver-page .strip-status {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--c-text-muted);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Dashboard body */
+#app.driver-page .dash-wrap {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: auto;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+#app.driver-page .dash-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+#app.driver-page .dash-header-label {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: var(--c-accent);
+    margin: 0 0 4px;
+}
+
+#app.driver-page .dash-header-title {
+    font-size: 24px;
+    line-height: 1.15;
+    font-weight: 800;
+    color: var(--c-primary);
+    margin: 0;
+}
+
+#app.driver-page .dash-plate {
+    font-size: 12px;
+    background: #ffffff;
+    color: var(--c-primary);
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-weight: 800;
+    white-space: nowrap;
+    box-shadow: var(--shadow-xs);
+}
+
+/* Cards */
+#app.driver-page .section-card,
+#app.driver-page .shift-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#app.driver-page .section-label,
+#app.driver-page .shift-card-header {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--c-text-secondary);
+    margin: 0;
+}
+
+/* Shift row */
+#app.driver-page .shift-status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#app.driver-page #shiftStatusText {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--c-text-dark);
+}
+
+#app.driver-page .shift-actions {
+    display: flex;
+    gap: 10px;
+}
+
+#app.driver-page #startShiftBtn,
+#app.driver-page #endShiftBtn {
+    flex: 1;
+}
+
+/* Inputs and buttons */
+#app.driver-page #routeSelect,
+#app.driver-page #startShiftBtn,
+#app.driver-page #endShiftBtn,
+#app.driver-page #broadcastBtn,
+#app.driver-page #busFullBtn,
+#app.driver-page .logout-btn {
+    min-height: 44px;
+    width: 100%;
+    font-family: inherit;
+}
+
+#app.driver-page #routeSelect {
+    margin-bottom: 0;
+}
+
+#app.driver-page #statusText {
+    font-size: 13px;
+    color: var(--c-text-muted);
+    margin: 0;
+}
+
+#app.driver-page .dash-footer {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Slightly larger screens still keep a phone-style centered card layout */
+@media (min-width: 480px) {
+    #app.driver-page {
+        padding-top: 140px;
+    }
+
+    #app.driver-page .sticky-strip-inner,
+    #app.driver-page .dash-wrap {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+}
+
