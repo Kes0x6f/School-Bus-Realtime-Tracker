@@ -14,10 +14,13 @@
  * 6. Runs a staleness checker every 30 s that switches the UI to "disconnected"
  *    if no update has arrived for 3+ minutes — giving students immediate feedback
  *    before the server-side cron even fires.
- * 7. [NEW] Watches the student's own device location and shows:
- *    - A blue "You are here" marker on the map
- *    - A dashed line from the student to the jeep
- *    - Distance (metres or kilometres) and general compass direction in the info panel
+ * 7. Watches the student's own device location and shows:
+ *    - Within viewport: a blue "You are here" pulsing dot at their real position
+ *    - Outside viewport: a blue arrow-dot pinned to the viewport edge, pointing
+ *      outward toward their actual off-screen position. Repositions on every pan.
+ *    - Tapping the dot/edge pin locks map focus on the student; a "Follow Jeep"
+ *      button appears. Tapping the button or the jeep returns focus to the jeep.
+ *    - Distance and compass direction shown in the info panel below the map.
  *
  * Status flow
  * ───────────
@@ -32,12 +35,14 @@ const STALE_CHECK_MS = 30 * 1000;     // check every 30s
 // ─── State ────────────────────────────────────────────────────────────────────
 
 let map;
-let jeepMarker         = null;
-let userMarker         = null;   // [NEW] "You are here" marker
-let proximityLine      = null;   // [NEW] dashed polyline between user and jeep
-let channel            = null;
+let jeepMarker            = null;
+let userMarker            = null;   // "You are here" marker (real pos or edge pin)
+let channel               = null;
 let staleCheckInterval    = null;
 let lastSeenTickerInterval = null;
+
+let focusLockedOnUser = false;  // true → jeep GPS updates don't auto-pan the map
+let isUserAtEdge      = false;  // true → marker is currently pinned to viewport edge
 
 let lastTimestamp     = 0;       // most recent whisper timestamp (ms)
 let lastWhisperTime   = 0;       // wall-clock time of last received update
@@ -84,6 +89,12 @@ function initMap() {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap',
     }).addTo(map);
+
+    // Recompute edge-pin position whenever the viewport changes so the arrow
+    // always sits at the correct edge and points in the right direction.
+    map.on('moveend', () => {
+        if (userLatLng && userMarker) updateUserMarkerPosition();
+    });
 
     setTimeout(() => map.invalidateSize(), 500);
 }
@@ -193,7 +204,16 @@ function initRealtime(vehicleId, expectedDriverId) {
         console.log("Whisper latency:", latency, "ms");
 
         // speed from whisper; gps_status derived locally for immediate response
-        const derivedStatus = (data.speed ?? 0) < 1 ? 'idle' : 'moving';
+        // Derive a provisional status from the whisper speed reading.
+        // Traffic vs idle requires server-side time context (last_moved_at),
+        // so this is a best-effort split corrected by the next broadcast event:
+        //   ≥ 3 km/h → moving   (above GPS noise floor)
+        //   0.5–3    → traffic  (slow queue or red light)
+        //   < 0.5    → idle     (essentially stationary)
+        const wSpeed = data.speed ?? 0;
+        const derivedStatus = wSpeed >= 3   ? 'moving'
+                            : wSpeed >= 0.5 ? 'traffic'
+                            :                 'idle';
         onLocationReceived({
             lat:       data.latitude,
             lng:       data.longitude,
@@ -292,6 +312,11 @@ function initUserLocation() {
             userLatLng = { lat, lng };
             placeUserMarker(lat, lng);
             updateProximityInfo();
+
+            // If the student has locked focus on themselves, follow their movement.
+            if (focusLockedOnUser) {
+                map.panTo([lat, lng], { animate: true, duration: 0.25 });
+            }
         },
         (err) => {
             console.warn('User geolocation error:', err.message);
@@ -303,83 +328,277 @@ function initUserLocation() {
 }
 
 /**
- * Place or move the "You are here" marker (blue pulsing dot).
- * The icon is a simple CSS div — no image assets required.
+ * Ensure the user marker exists, then delegate position + icon to
+ * updateUserMarkerPosition() which decides whether to show the real
+ * location or the edge pin depending on the current viewport.
  */
 function placeUserMarker(lat, lng) {
     if (!map) return;
 
     if (!userMarker) {
-        const icon = L.divIcon({
-            className: '',
-            html: `
-                <div style="
-                    position: relative;
-                    width: 18px; height: 18px;
-                ">
-                    <!-- Outer pulse ring -->
-                    <div style="
-                        position: absolute; inset: -6px;
-                        border-radius: 50%;
-                        background: rgba(30,136,229,0.20);
-                        animation: userPulse 2s ease-out infinite;
-                    "></div>
-                    <!-- Inner solid dot -->
-                    <div style="
-                        width: 18px; height: 18px;
-                        border-radius: 50%;
-                        background: #1E88E5;
-                        border: 2.5px solid #fff;
-                        box-shadow: 0 1px 6px rgba(0,0,0,0.4);
-                    "></div>
-                </div>
-                <style>
-                    @keyframes userPulse {
-                        0%   { transform: scale(0.6); opacity: 0.8; }
-                        70%  { transform: scale(2.2); opacity: 0;   }
-                        100% { transform: scale(2.2); opacity: 0;   }
-                    }
-                </style>
-            `,
-            iconSize:   [18, 18],
-            iconAnchor: [9, 9],
-        });
+        userMarker = L.marker([lat, lng], {
+            icon:         createNormalUserIcon(),
+            zIndexOffset: 100,
+        })
+        .addTo(map);
 
-        userMarker = L.marker([lat, lng], { icon, zIndexOffset: 100 })
-            .bindTooltip('You are here', { permanent: false, direction: 'top', offset: [0, -12] })
-            .addTo(map);
-    } else {
-        userMarker.setLatLng([lat, lng]);
+        userMarker.on('click', onUserMarkerClick);
     }
 
-    drawProximityLine();
+    updateUserMarkerPosition();
 }
 
 /**
- * Draw (or redraw) the dashed polyline connecting the student to the jeep.
- * Only drawn when both positions are known.
+ * Decides whether the student is inside the current viewport.
+ *
+ * In bounds  → place the pulsing dot at the real GPS position.
+ * Out of bounds → cast a ray from the viewport centre toward the real position,
+ *                 find where it exits the padded rectangle, place a directional
+ *                 arrow icon there so the student is never "lost" off-screen.
+ *
+ * Called on every GPS fix AND on every map moveend event.
  */
-function drawProximityLine() {
-    if (!map || !userLatLng || !jeepLatLng) return;
+function updateUserMarkerPosition() {
+    if (!userMarker || !userLatLng || !map) return;
 
-    const points = [
-        [userLatLng.lat, userLatLng.lng],
-        [jeepLatLng.lat, jeepLatLng.lng],
-    ];
+    const realLatLng = L.latLng(userLatLng.lat, userLatLng.lng);
+    const inBounds   = map.getBounds().contains(realLatLng);
 
-    if (proximityLine) {
-        proximityLine.setLatLngs(points);
+    if (inBounds) {
+        if (isUserAtEdge) {
+            isUserAtEdge = false;
+            userMarker.setIcon(createNormalUserIcon());
+        }
+        userMarker.setLatLng(realLatLng);
     } else {
-        proximityLine = L.polyline(points, {
-            color:     '#1E88E5',
-            weight:    2,
-            opacity:   0.55,
-            dashArray: '6 8',   // dashed — clearly not a road
-        }).addTo(map);
+        const { edgeLatLng, bearing } = computeEdgePosition(realLatLng);
+        userMarker.setLatLng(edgeLatLng);
+        userMarker.setIcon(createEdgeUserIcon(bearing));
+        isUserAtEdge = true;
     }
 }
 
-// ─── [NEW] Proximity calculation ──────────────────────────────────────────────
+/**
+ * Cast a ray from the viewport centre toward `targetLatLng` and return the
+ * point where that ray exits the inset rectangle (padding = 28 px per edge).
+ *
+ * Also returns the screen-space bearing (degrees clockwise from up) so the
+ * edge icon arrow can point outward toward the student's real position.
+ *
+ * Geometry: parametric line  P(t) = centre + t * direction, t ≥ 0.
+ * We solve for the smallest t > 0 that hits any of the four edges, subject
+ * to the intersection lying within the adjacent pair of edges.
+ */
+function computeEdgePosition(targetLatLng) {
+    const padding  = 28;
+    const mapSize  = map.getSize();
+    const cx       = mapSize.x / 2;
+    const cy       = mapSize.y / 2;
+
+    const targetPx = map.latLngToContainerPoint(targetLatLng);
+    const dx = targetPx.x - cx;
+    const dy = targetPx.y - cy;
+
+    const left   = padding;
+    const right  = mapSize.x - padding;
+    const top    = padding;
+    const bottom = mapSize.y - padding;
+
+    let bestT = Infinity;
+
+    // Left edge (dx < 0 means we're heading left)
+    if (dx < 0) {
+        const t = (left - cx) / dx;
+        const y = cy + t * dy;
+        if (y >= top && y <= bottom) bestT = Math.min(bestT, t);
+    }
+    // Right edge
+    if (dx > 0) {
+        const t = (right - cx) / dx;
+        const y = cy + t * dy;
+        if (y >= top && y <= bottom) bestT = Math.min(bestT, t);
+    }
+    // Top edge (dy < 0 means we're heading up)
+    if (dy < 0) {
+        const t = (top - cy) / dy;
+        const x = cx + t * dx;
+        if (x >= left && x <= right) bestT = Math.min(bestT, t);
+    }
+    // Bottom edge
+    if (dy > 0) {
+        const t = (bottom - cy) / dy;
+        const x = cx + t * dx;
+        if (x >= left && x <= right) bestT = Math.min(bestT, t);
+    }
+
+    const edgePx = L.point(
+        Math.max(left, Math.min(right, cx + bestT * dx)),
+        Math.max(top,  Math.min(bottom, cy + bestT * dy))
+    );
+
+    // Bearing in screen space: atan2(dx, -dy) gives 0 = up, 90 = right.
+    const bearing = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+
+    return {
+        edgeLatLng: map.containerPointToLatLng(edgePx),
+        bearing,
+    };
+}
+
+// ─── User marker icons ────────────────────────────────────────────────────────
+
+/** Blue pulsing dot with a permanent "You are here" label — shown when the student is within the viewport. */
+function createNormalUserIcon() {
+    return L.divIcon({
+        className: '',
+        html: `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <div style="position:relative;width:18px;height:18px;">
+                    <div style="
+                        position:absolute;inset:-6px;border-radius:50%;
+                        background:rgba(30,136,229,0.20);
+                        animation:userPulse 2s ease-out infinite;
+                    "></div>
+                    <div style="
+                        width:18px;height:18px;border-radius:50%;
+                        background:#1E88E5;border:2.5px solid #fff;
+                        box-shadow:0 1px 6px rgba(0,0,0,0.4);
+                    "></div>
+                </div>
+                <div style="
+                    background:rgba(0,0,0,0.62);
+                    color:#fff;
+                    font-size:10px;
+                    font-weight:700;
+                    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+                    padding:3px 8px;
+                    border-radius:4px;
+                    white-space:nowrap;
+                    letter-spacing:0.4px;
+                    line-height:1.3;
+                    box-shadow:0 1px 4px rgba(0,0,0,0.25);
+                ">You are here</div>
+            </div>
+            <style>
+                @keyframes userPulse {
+                    0%   { transform:scale(0.6); opacity:0.8; }
+                    70%  { transform:scale(2.2); opacity:0;   }
+                    100% { transform:scale(2.2); opacity:0;   }
+                }
+            </style>`,
+        // iconSize width covers the label (~82 px); height = dot(18) + gap(4) + label(~20) = 42
+        iconSize:   [82, 42],
+        iconAnchor: [41, 9],   // x: centre of icon;  y: centre of the dot (18 / 2)
+    });
+}
+
+/**
+ * Blue circle with a white arrow and a permanent "You" label — shown at the
+ * viewport edge when the student is off-screen. `bearing` is degrees clockwise
+ * from up (screen space), so rotating the SVG arrow by that angle makes it
+ * point outward toward the student's actual off-screen position.
+ */
+function createEdgeUserIcon(bearing) {
+    return L.divIcon({
+        className: '',
+        html: `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <div style="
+                    width:30px;height:30px;border-radius:50%;
+                    background:#1E88E5;
+                    border:2.5px solid #fff;
+                    box-shadow:0 2px 10px rgba(0,0,0,0.35);
+                    display:flex;align-items:center;justify-content:center;
+                ">
+                    <svg width="13" height="13" viewBox="0 0 13 13"
+                         style="display:block;transform:rotate(${bearing}deg);">
+                        <polygon points="6.5,1 12,12 6.5,8.5 1,12" fill="#fff"/>
+                    </svg>
+                </div>
+                <div style="
+                    background:rgba(0,0,0,0.62);
+                    color:#fff;
+                    font-size:10px;
+                    font-weight:700;
+                    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+                    padding:3px 8px;
+                    border-radius:4px;
+                    white-space:nowrap;
+                    letter-spacing:0.4px;
+                    line-height:1.3;
+                    box-shadow:0 1px 4px rgba(0,0,0,0.25);
+                ">You</div>
+            </div>`,
+        // dot(30) + gap(4) + label(~20) = 54 h; label "You" ≈ 34 px wide, dot wider at 30
+        iconSize:   [50, 54],
+        iconAnchor: [25, 15],   // x: centre; y: centre of the 30 px dot
+    });
+}
+
+// ─── Focus lock ───────────────────────────────────────────────────────────────
+
+/**
+ * Called when the student taps their own marker (real dot or edge pin).
+ * Pans to the actual GPS position, locks focus so jeep updates don't steal
+ * the pan, and shows the "Follow Jeep" button.
+ */
+function onUserMarkerClick() {
+    if (!userLatLng) return;
+    focusLockedOnUser = true;
+    map.panTo([userLatLng.lat, userLatLng.lng], { animate: true, duration: 0.4 });
+    showFollowJeepButton();
+}
+
+/**
+ * Returns map focus to the jeep and removes the "Follow Jeep" button.
+ * Bound to the jeep marker click and the button itself.
+ */
+function returnFocusToJeep() {
+    focusLockedOnUser = false;
+    hideFollowJeepButton();
+    if (jeepLatLng) {
+        map.panTo([jeepLatLng.lat, jeepLatLng.lng], { animate: true, duration: 0.4 });
+    }
+}
+
+/** Inject a floating "Follow Jeep 🚌" button inside #mapContainer. */
+function showFollowJeepButton() {
+    if (document.getElementById('followJeepBtn')) return;
+
+    const btn = document.createElement('button');
+    btn.id          = 'followJeepBtn';
+    btn.textContent = '🚌 Follow Jeep';
+    btn.setAttribute('aria-label', 'Return map focus to the jeep');
+
+    Object.assign(btn.style, {
+        position:   'absolute',
+        bottom:     '48px',        // clear of the Leaflet attribution
+        left:       '50%',
+        transform:  'translateX(-50%)',
+        zIndex:     '1001',
+        background: 'var(--c-primary, #002D62)',
+        color:      '#fff',
+        border:     'none',
+        padding:    '8px 20px',
+        borderRadius: '20px',
+        fontSize:   '13px',
+        fontWeight: '600',
+        cursor:     'pointer',
+        boxShadow:  '0 2px 12px rgba(0,0,0,0.28)',
+        fontFamily: 'inherit',
+        whiteSpace: 'nowrap',
+        transition: 'opacity 0.2s',
+    });
+
+    btn.addEventListener('click', returnFocusToJeep);
+    document.getElementById('mapContainer').appendChild(btn);
+}
+
+function hideFollowJeepButton() {
+    document.getElementById('followJeepBtn')?.remove();
+}
+
+// ─── Proximity calculation ────────────────────────────────────────────────────
 
 /**
  * Recalculate and render distance + direction whenever either position changes.
@@ -394,9 +613,6 @@ function updateProximityInfo() {
 
     setInfoField('infoDistance',  formatDistance(distM));
     setInfoField('infoDirection', `${arrow} ${cardinalLabel}`);
-
-    // Redraw the line in case the jeep moved
-    drawProximityLine();
 }
 
 /**
@@ -498,12 +714,21 @@ function applyGpsStatus(gpsStatus, lastSeen, silent = false) {
             }
             break;
 
+        case 'traffic':
+            hideBanner('noSignalBanner');
+            showBanner('idleBanner', '🚦 Jeep is in traffic — moving slowly');
+            setStatusPill('traffic');
+            if (changed && !silent) {
+                showToast('Jeep is caught in traffic', 'warning');
+            }
+            break;
+
         case 'idle':
             hideBanner('noSignalBanner');
-            showBanner('idleBanner', '🚌 Vehicle is currently stopped or idling');
+            showBanner('idleBanner', '🚌 Vehicle is stopped — waiting for passengers');
             setStatusPill('idle');
             if (changed && !silent) {
-                showToast('Vehicle has stopped — waiting for passengers', 'info');
+                showToast('Jeep is idle — waiting for passengers', 'info');
             }
             break;
 
@@ -530,6 +755,7 @@ function applyGpsStatus(gpsStatus, lastSeen, silent = false) {
 
 const PILL_CONFIG = {
     moving:       { dot: '#43A047', text: '● LIVE',      bg: 'rgba(0,0,0,0.65)' },
+    traffic:      { dot: '#F57C00', text: '🚦 TRAFFIC',  bg: 'rgba(0,0,0,0.65)' },
     idle:         { dot: '#FBC02D', text: '● IDLE',      bg: 'rgba(0,0,0,0.65)' },
     disconnected: { dot: '#E64A19', text: '◌ NO SIGNAL', bg: 'rgba(0,0,0,0.65)' },
     shift_ended:  { dot: '#9E9E9E', text: '■ ENDED',     bg: 'rgba(0,0,0,0.65)' },
@@ -738,6 +964,10 @@ function placeMarker(lat, lng, gpsStatus = 'disconnected') {
         })
         .bindTooltip('Jeep', { permanent: false, direction: 'top', offset: [0, -6] })
         .addTo(map);
+
+        // Tapping the jeep returns map focus to it when the student has
+        // previously locked focus on their own location.
+        jeepMarker.on('click', returnFocusToJeep);
     }
     map.setView([lat, lng], 16);
 }
@@ -766,7 +996,10 @@ function updateMarker(lat, lng) {
         if (i >= steps) clearInterval(interval);
     }, 50);
 
-    map.panTo([lat, lng], { animate: true, duration: 0.25 });
+    // Don't steal the pan if the student has locked focus on themselves.
+    if (!focusLockedOnUser) {
+        map.panTo([lat, lng], { animate: true, duration: 0.25 });
+    }
 }
 
 // ─── Formatters ───────────────────────────────────────────────────────────────

@@ -53,14 +53,23 @@ class GpsController extends Controller
 
         $wasGpsStale = !$vehicle->is_active;
 
-        $vehicle->update([
+        $updateData = [
             'latitude'   => $validated['latitude'],
             'longitude'  => $validated['longitude'],
             'speed'      => $validated['speed'] ?? null,
             'last_seen'  => now(),
             'is_active'  => true,
             'route_name' => $validated['route_name'] ?? $vehicle->route_name,
-        ]);
+        ];
+
+        // Stamp last_moved_at whenever the jeep is clearly rolling.
+        // 3 km/h sits above typical GPS noise at low speeds, so a stationary
+        // jeep with jittery readings doesn't accidentally reset the timer.
+        if (($validated['speed'] ?? 0) >= 3) {
+            $updateData['last_moved_at'] = now();
+        }
+
+        $vehicle->update($updateData);
 
         $vehicle->refresh();
 

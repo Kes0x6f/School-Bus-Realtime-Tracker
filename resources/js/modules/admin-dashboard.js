@@ -118,6 +118,7 @@ function placeOrUpdateMarker(v) {
     if (!v.latitude || !v.longitude) return;
 
     const color = v.gps_status === 'moving'      ? '#002D62'
+                : v.gps_status === 'traffic'     ? '#F57C00'
                 : v.gps_status === 'idle'         ? '#FBC02D'
                 : v.gps_status === 'disconnected' ? '#E64A19'
                 : '#9E9E9E';
@@ -152,6 +153,7 @@ function renderSidebar(activeVehicles) {
 
     list.innerHTML = activeVehicles.map(v => {
         const dot = v.gps_status === 'moving'       ? '#43A047'
+                  : v.gps_status === 'traffic'      ? '#F57C00'
                   : v.gps_status === 'idle'          ? '#FBC02D'
                   : v.gps_status === 'disconnected'  ? '#E64A19'
                   : '#9E9E9E';
@@ -175,7 +177,7 @@ function renderSidebar(activeVehicles) {
 
 function updateMapStats(vehicles) {
     const active   = vehicles.filter(v => v.shift_active);
-    const moving   = active.filter(v => v.gps_status === 'moving').length;
+    const moving   = active.filter(v => v.gps_status === 'moving' || v.gps_status === 'traffic').length;
     const noSignal = active.filter(v => v.gps_status === 'disconnected').length;
     setText('statOnShift',  active.length);
     setText('statMoving',   moving);
@@ -285,7 +287,7 @@ function handleUserAction(action, userId, triggerEl) {
         case 'assign-vehicle':  return openAssignVehicleModal(user);
         case 'deactivate-user': return confirmDeactivateUser(user);
         case 'reactivate-user': return reactivateUser(user, triggerEl);
-        case 'change-password':      return openChangePasswordModal(user);
+        case 'change-password': return openChangePasswordModal(user);
     }
 }
 
@@ -630,179 +632,6 @@ function openAddUserModal() {
     });
 }
 
-function openImportUsersModal() {
-    openModal(`
-        <div class="modal-header">
-            <h2 class="modal-title">Import Users from CSV</h2>
-            <button class="modal-close">✕</button>
-        </div>
-
-        <p style="font-size:12px;color:#6B7280;margin-bottom:12px;">
-            Upload a CSV file with columns: <strong>name, email, password, role</strong>.
-            Rows with errors are skipped — the rest still import.
-        </p>
-
-        <a id="downloadTemplateLink"
-           href="/admin/api/users/import/template"
-           style="display:inline-block;font-size:12px;color:#185FA5;margin-bottom:16px;text-decoration:underline;">
-            ⬇ Download template CSV
-        </a>
-
-        <form class="modal-form" id="importForm" enctype="multipart/form-data">
-            <label class="modal-label">CSV File</label>
-
-            <div id="dropZone" style="
-                border: 2px dashed #D1D5DB;
-                border-radius: 8px;
-                padding: 24px;
-                text-align: center;
-                cursor: pointer;
-                transition: border-color 0.2s, background 0.2s;
-                margin-bottom: 4px;
-            ">
-                <p style="font-size:13px;color:#6B7280;margin:0;" id="dropLabel">
-                    Drag and drop your CSV here, or click to browse
-                </p>
-                <input type="file" name="csv_file" id="csvFileInput"
-                       accept=".csv,text/csv" style="display:none;">
-            </div>
-
-            <p id="selectedFileName"
-               style="font-size:11px;color:#9CA3AF;margin-top:4px;"></p>
-
-            <button type="submit" class="admin-btn-primary"
-                    style="width:100%;margin-top:12px;">
-                Import Users
-            </button>
-        </form>
-
-        <div id="importResults" style="display:none;margin-top:16px;"></div>
-    `);
-
-    initDropZone();
-}
-
-function initDropZone() {
-    const zone   = document.getElementById('dropZone');
-    const input  = document.getElementById('csvFileInput');
-    const label  = document.getElementById('dropLabel');
-    const nameEl = document.getElementById('selectedFileName');
-    const form   = document.getElementById('importForm');
-
-    // Click on zone opens file picker
-    zone.addEventListener('click', () => input.click());
-
-    // Drag-over visual feedback
-    zone.addEventListener('dragover', e => {
-        e.preventDefault();
-        zone.style.borderColor  = '#185FA5';
-        zone.style.background   = '#EFF6FF';
-    });
-
-    zone.addEventListener('dragleave', () => {
-        zone.style.borderColor = '#D1D5DB';
-        zone.style.background  = '';
-    });
-
-    // File dropped
-    zone.addEventListener('drop', e => {
-        e.preventDefault();
-        zone.style.borderColor = '#D1D5DB';
-        zone.style.background  = '';
-        const file = e.dataTransfer.files[0];
-        if (file) {
-            // Assign the dropped file to the hidden input
-            const dt = new DataTransfer();
-            dt.items.add(file);
-            input.files = dt.files;
-            nameEl.textContent = `Selected: ${file.name}`;
-            label.textContent  = file.name;
-        }
-    });
-
-    // File chosen via picker
-    input.addEventListener('change', () => {
-        if (input.files[0]) {
-            nameEl.textContent = `Selected: ${input.files[0].name}`;
-            label.textContent  = input.files[0].name;
-        }
-    });
-
-    // Form submission
-    form.addEventListener('submit', async e => {
-        e.preventDefault();
-        await submitImport(form);
-    });
-}
-
-async function submitImport(form) {
-    const submitBtn = form.querySelector('[type="submit"]');
-    const results   = document.getElementById('importResults');
-
-    if (!form.querySelector('#csvFileInput').files[0]) {
-        alert('Please select a CSV file first.');
-        return;
-    }
-
-    setLoading(submitBtn, true, 'Importing…');
-
-    const formData = new FormData(form);
-    formData.append('_token', CSRF());
-
-    try {
-        const res  = await fetch('/admin/api/users/import', {
-            method:      'POST',
-            credentials: 'same-origin',
-            headers: { 'X-CSRF-TOKEN': CSRF() },
-            body:        formData,
-            // Do NOT set Content-Type — the browser sets multipart/form-data
-            // with the correct boundary automatically
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-            throw new Error(data.message ?? 'Import failed.');
-        }
-
-        // Show summary
-        results.style.display = 'block';
-
-        const errorHtml = data.errors.length
-            ? `<div style="margin-top:10px;">
-                   <p style="font-size:12px;font-weight:600;color:#991B1B;margin-bottom:6px;">
-                       ${data.errors.length} row(s) had errors and were skipped:
-                   </p>
-                   <ul style="font-size:11px;color:#6B7280;padding-left:16px;max-height:160px;overflow-y:auto;">
-                       ${data.errors.map(e => `<li style="margin-bottom:4px;">${escapeHtml(e)}</li>`).join('')}
-                   </ul>
-               </div>`
-            : '';
-
-        results.innerHTML = `
-            <div style="background:${data.created > 0 ? '#D1FAE5' : '#FEF3C7'};
-                        border-radius:6px;padding:12px;">
-                <p style="font-size:13px;font-weight:600;
-                           color:${data.created > 0 ? '#065F46' : '#92400E'};margin:0;">
-                    ${data.created > 0
-                        ? `✓ ${data.created} user${data.created !== 1 ? 's' : ''} imported successfully`
-                        : 'No users were imported'}
-                </p>
-            </div>
-            ${errorHtml}`;
-
-        // Refresh the users table so the new accounts appear immediately
-        if (data.created > 0) {
-            await refreshUsers();
-        }
-
-    } catch (err) {
-        alert(err.message ?? 'Something went wrong during import.');
-    } finally {
-        setLoading(submitBtn, false, 'Import Users');
-    }
-}
-
 function openEditUserModal(user) {
     openModal(`
         <div class="modal-header">
@@ -826,91 +655,6 @@ function openEditUserModal(user) {
         const data = Object.fromEntries(new FormData(form));
         const res  = await apiFetch(`/admin/api/users/${user.id}`, 'PUT', data);
         if (res.status === 'success') { await refreshUsers(); closeModal(); }
-    });
-}
-
-function openChangePasswordModal(user) {
-    openModal(`
-        <div class="modal-header">
-            <h2 class="modal-title">Change password — ${escapeHtml(user.name)}</h2>
-            <button class="modal-close">✕</button>
-        </div>
-        <p style="font-size:12px;color:#6B7280;margin-bottom:12px;">
-            The user will need to use this new password on their next login.
-        </p>
-        <form class="modal-form">
-            <label class="modal-label">New password</label>
-            <input class="modal-input"
-                   name="password"
-                   type="password"
-                   minlength="8"
-                   placeholder="At least 8 characters"
-                   required
-                   autocomplete="new-password">
-
-            <label class="modal-label">Confirm new password</label>
-            <input class="modal-input"
-                   name="password_confirmation"
-                   type="password"
-                   minlength="8"
-                   placeholder="Repeat the password"
-                   required
-                   autocomplete="new-password">
-
-            <p id="passwordMatchHint"
-               style="font-size:11px;color:#9CA3AF;margin-top:-8px;">
-            </p>
-
-            <button type="submit"
-                    class="admin-btn-primary"
-                    style="width:100%;margin-top:4px;">
-                Set new password
-            </button>
-        </form>
-    `, async (form) => {
-        const password             = form.password.value;
-        const password_confirmation = form.password_confirmation.value;
-
-        // Client-side match check before hitting the server
-        if (password !== password_confirmation) {
-            document.getElementById('passwordMatchHint').textContent =
-                'Passwords do not match.';
-            document.getElementById('passwordMatchHint').style.color = '#DC2626';
-            throw new Error('Passwords do not match.'); // prevents modal from closing
-        }
-
-        const res = await apiFetch(
-            `/admin/api/users/${user.id}/change-password`,
-            'POST',
-            { password, password_confirmation }
-        );
-
-        if (res.status === 'success') {
-            closeModal();
-            // Show a brief confirmation toast instead of reloading the table —
-            // no visible data changed (the password hash is not displayed)
-            showAdminToast(`Password updated for ${user.name}.`);
-        }
-    });
-
-    // Live match indicator as the admin types the confirmation
-    const modal = document.getElementById('modalBox');
-    const confirmInput = modal?.querySelector('[name="password_confirmation"]');
-    const hint         = modal?.querySelector('#passwordMatchHint');
-
-    confirmInput?.addEventListener('input', () => {
-        const pw = modal.querySelector('[name="password"]').value;
-        if (!confirmInput.value) {
-            hint.textContent = '';
-            return;
-        }
-        if (confirmInput.value === pw) {
-            hint.textContent = '✓ Passwords match';
-            hint.style.color = '#065F46';
-        } else {
-            hint.textContent = 'Passwords do not match';
-            hint.style.color = '#DC2626';
-        }
     });
 }
 
@@ -1121,6 +865,242 @@ async function apiFetch(url, method, body) {
     return data;
 }
 
+function openChangePasswordModal(user) {
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Change password — ${escapeHtml(user.name)}</h2>
+            <button class="modal-close">✕</button>
+        </div>
+        <p style="font-size:12px;color:#6B7280;margin-bottom:12px;">
+            The user will need to use this new password on their next login.
+        </p>
+        <form class="modal-form">
+            <label class="modal-label">New password</label>
+            <input class="modal-input"
+                   name="password"
+                   type="password"
+                   minlength="8"
+                   placeholder="At least 8 characters"
+                   required
+                   autocomplete="new-password">
+
+            <label class="modal-label">Confirm new password</label>
+            <input class="modal-input"
+                   name="password_confirmation"
+                   type="password"
+                   minlength="8"
+                   placeholder="Repeat the password"
+                   required
+                   autocomplete="new-password">
+
+            <p id="passwordMatchHint"
+               style="font-size:11px;color:#9CA3AF;margin-top:-8px;">
+            </p>
+
+            <button type="submit"
+                    class="admin-btn-primary"
+                    style="width:100%;margin-top:4px;">
+                Set new password
+            </button>
+        </form>
+    `, async (form) => {
+        const password              = form.password.value;
+        const password_confirmation = form.password_confirmation.value;
+
+        if (password !== password_confirmation) {
+            document.getElementById('passwordMatchHint').textContent = 'Passwords do not match.';
+            document.getElementById('passwordMatchHint').style.color = '#DC2626';
+            throw new Error('Passwords do not match.');
+        }
+
+        const res = await apiFetch(
+            `/admin/api/users/${user.id}/change-password`,
+            'POST',
+            { password, password_confirmation }
+        );
+
+        if (res.status === 'success') {
+            closeModal();
+            showAdminToast(`Password updated for ${user.name}.`);
+        }
+    });
+
+    const modal        = document.getElementById('modalBox');
+    const confirmInput = modal?.querySelector('[name="password_confirmation"]');
+    const hint         = modal?.querySelector('#passwordMatchHint');
+
+    confirmInput?.addEventListener('input', () => {
+        const pw = modal.querySelector('[name="password"]').value;
+        if (!confirmInput.value) { hint.textContent = ''; return; }
+        if (confirmInput.value === pw) {
+            hint.textContent = '✓ Passwords match';
+            hint.style.color = '#065F46';
+        } else {
+            hint.textContent = 'Passwords do not match';
+            hint.style.color = '#DC2626';
+        }
+    });
+}
+
+function openImportUsersModal() {
+    openModal(`
+        <div class="modal-header">
+            <h2 class="modal-title">Import Users from CSV</h2>
+            <button class="modal-close">✕</button>
+        </div>
+
+        <p style="font-size:12px;color:#6B7280;margin-bottom:12px;">
+            Upload a CSV file with columns: <strong>name, email, password, role</strong>.
+            Rows with errors are skipped — the rest still import.
+        </p>
+
+        <a id="downloadTemplateLink"
+           href="/admin/api/users/import/template"
+           style="display:inline-block;font-size:12px;color:#185FA5;margin-bottom:16px;text-decoration:underline;">
+            ⬇ Download template CSV
+        </a>
+
+        <form class="modal-form" id="importForm" enctype="multipart/form-data">
+            <label class="modal-label">CSV File</label>
+
+            <div id="dropZone" style="
+                border: 2px dashed #D1D5DB;
+                border-radius: 8px;
+                padding: 24px;
+                text-align: center;
+                cursor: pointer;
+                transition: border-color 0.2s, background 0.2s;
+                margin-bottom: 4px;
+            ">
+                <p style="font-size:13px;color:#6B7280;margin:0;" id="dropLabel">
+                    Drag and drop your CSV here, or click to browse
+                </p>
+                <input type="file" name="csv_file" id="csvFileInput"
+                       accept=".csv,text/csv" style="display:none;">
+            </div>
+
+            <p id="selectedFileName"
+               style="font-size:11px;color:#9CA3AF;margin-top:4px;"></p>
+
+            <button type="submit" class="admin-btn-primary"
+                    style="width:100%;margin-top:12px;">
+                Import Users
+            </button>
+        </form>
+
+        <div id="importResults" style="display:none;margin-top:16px;"></div>
+    `);
+
+    initDropZone();
+}
+
+function initDropZone() {
+    const zone   = document.getElementById('dropZone');
+    const input  = document.getElementById('csvFileInput');
+    const label  = document.getElementById('dropLabel');
+    const nameEl = document.getElementById('selectedFileName');
+    const form   = document.getElementById('importForm');
+
+    zone.addEventListener('click', () => input.click());
+
+    zone.addEventListener('dragover', e => {
+        e.preventDefault();
+        zone.style.borderColor = '#185FA5';
+        zone.style.background  = '#EFF6FF';
+    });
+
+    zone.addEventListener('dragleave', () => {
+        zone.style.borderColor = '#D1D5DB';
+        zone.style.background  = '';
+    });
+
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.style.borderColor = '#D1D5DB';
+        zone.style.background  = '';
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            nameEl.textContent = `Selected: ${file.name}`;
+            label.textContent  = file.name;
+        }
+    });
+
+    input.addEventListener('change', () => {
+        if (input.files[0]) {
+            nameEl.textContent = `Selected: ${input.files[0].name}`;
+            label.textContent  = input.files[0].name;
+        }
+    });
+
+    form.addEventListener('submit', async e => {
+        e.preventDefault();
+        await submitImport(form);
+    });
+}
+
+async function submitImport(form) {
+    const submitBtn = form.querySelector('[type="submit"]');
+    const results   = document.getElementById('importResults');
+
+    if (!form.querySelector('#csvFileInput').files[0]) {
+        alert('Please select a CSV file first.');
+        return;
+    }
+
+    setLoading(submitBtn, true, 'Importing…');
+
+    const formData = new FormData(form);
+    formData.append('_token', CSRF());
+
+    try {
+        const res  = await fetch('/admin/api/users/import', {
+            method:      'POST',
+            credentials: 'same-origin',
+            headers: { 'X-CSRF-TOKEN': CSRF() },
+            body:        formData,
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.message ?? 'Import failed.');
+
+        results.style.display = 'block';
+
+        const errorHtml = data.errors.length
+            ? `<div style="margin-top:10px;">
+                   <p style="font-size:12px;font-weight:600;color:#991B1B;margin-bottom:6px;">
+                       ${data.errors.length} row(s) had errors and were skipped:
+                   </p>
+                   <ul style="font-size:11px;color:#6B7280;padding-left:16px;max-height:160px;overflow-y:auto;">
+                       ${data.errors.map(e => `<li style="margin-bottom:4px;">${escapeHtml(e)}</li>`).join('')}
+                   </ul>
+               </div>`
+            : '';
+
+        results.innerHTML = `
+            <div style="background:${data.created > 0 ? '#D1FAE5' : '#FEF3C7'};
+                        border-radius:6px;padding:12px;">
+                <p style="font-size:13px;font-weight:600;
+                           color:${data.created > 0 ? '#065F46' : '#92400E'};margin:0;">
+                    ${data.created > 0
+                        ? `✓ ${data.created} user${data.created !== 1 ? 's' : ''} imported successfully`
+                        : 'No users were imported'}
+                </p>
+            </div>
+            ${errorHtml}`;
+
+        if (data.created > 0) await refreshUsers();
+
+    } catch (err) {
+        alert(err.message ?? 'Something went wrong during import.');
+    } finally {
+        setLoading(submitBtn, false, 'Import Users');
+    }
+}
+
 function showAdminToast(message) {
     const toast = document.createElement('div');
     toast.textContent = message;
@@ -1138,16 +1118,13 @@ function showAdminToast(message) {
         opacity: 0;
         transition: opacity 0.2s;
     `;
-
     document.body.appendChild(toast);
     requestAnimationFrame(() => toast.style.opacity = '1');
-
     setTimeout(() => {
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 250);
     }, 3000);
 }
-
 
 function setText(id, val) {
     const el = document.getElementById(id);
@@ -1179,6 +1156,7 @@ function roleBadge(role) {
 function gpsStatusBadge(status) {
     const map = {
         moving:       ['#D1FAE5', '#065F46', 'Moving'],
+        traffic:      ['#FFF3E0', '#E65100', 'In traffic'],
         idle:         ['#FEF3C7', '#92400E', 'Idle'],
         disconnected: ['#FEE2E2', '#991B1B', 'No signal'],
         shift_ended:  ['#F3F4F6', '#4B5563', 'Off shift'],

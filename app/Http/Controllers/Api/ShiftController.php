@@ -38,6 +38,7 @@ class ShiftController extends Controller
             'shift_started_at' => now(),
             'shift_ended_at'   => null,
             'is_active'        => false,
+            'last_moved_at'    => null,   // reset so idle/traffic clock starts fresh
             'route_name'       => $validated['route_name'] ?? $vehicle->route_name,
         ]);
 

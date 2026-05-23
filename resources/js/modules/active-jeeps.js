@@ -63,7 +63,7 @@ function subscribeToGlobalChannel(container) {
                 // New vehicle started a shift while page is open
                 addVehicle(container, vehicle);
             } else {
-                updateCardStatus(vehicle.id, vehicle.gps_status, vehicle.last_seen, vehicle.speed, vehicle.is_full);
+                updateCardStatus(vehicle.id, vehicle.gps_status, vehicle.last_seen, vehicle.speed, vehicle.is_full, vehicle.route_name);
             }
         });
 }
@@ -112,10 +112,20 @@ function removeVehicle(id) {
 /**
  * Update the status badge on an existing card.
  * Called on both location.updated and vehicle.status.changed events.
+ *
+ * routeName — when provided, updates the visible route label and data-route
+ *             so the route filter keeps working after a mid-shift route change.
  */
-function updateCardStatus(id, gpsStatus, lastSeen, speed, is_full) {
+function updateCardStatus(id, gpsStatus, lastSeen, speed, is_full, routeName) {
     const el = document.querySelector(`[data-vehicle-id="${id}"]`);
     if (!el) return;
+
+    // Update route label + filter attribute when the driver changes route mid-shift
+    if (routeName !== undefined && routeName !== null) {
+        const routeEl = el.querySelector('.jeepRoute');
+        if (routeEl) routeEl.textContent = `Route: ${routeName}`;
+        el.dataset.route = routeName;
+    }
 
     const badge = el.querySelector(".statusBadge");
     if (!badge) return;
@@ -159,6 +169,9 @@ function resolveStatusStyle(gpsStatus, lastSeen) {
     switch (gpsStatus) {
         case 'moving':
             return { bgColor: '#43A047', textColor: '#fff', label: '● LIVE' };
+
+        case 'traffic':
+            return { bgColor: '#F57C00', textColor: '#fff', label: '🚦 TRAFFIC' };
 
         case 'idle':
             return { bgColor: '#FBC02D', textColor: '#4E342E', label: '● IDLE' };

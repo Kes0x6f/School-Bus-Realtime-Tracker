@@ -328,7 +328,15 @@ function startGPS(vehicleId, userId, csrfToken) {
                 }).catch(err => console.warn('HTTP sync failed:', err));
             }
 
-            updateStickyStrip(speed < 1 ? 'idle' : 'moving');
+            // Mirror the 3-tier status logic from Vehicle::getGpsStatusAttribute()
+            // and tracking.js so the strip always agrees with what students see.
+            //   ≥ 3   → moving   (clearly rolling)
+            //   ≥ 0.5 → traffic  (slow queue / red light — moved recently)
+            //   < 0.5 → idle     (stationary — waiting for passengers)
+            const derivedStatus = speed >= 3   ? 'moving'
+                                : speed >= 0.5 ? 'traffic'
+                                :                'idle';
+            updateStickyStrip(derivedStatus);
         },
         (error) => { console.error('GPS error:', error); setGpsStatusText('GPS Error'); },
         { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 }
@@ -345,7 +353,7 @@ function stopGPS() {
 
 /**
  * Update the always-visible top strip with the current shift dot + GPS status.
- * gpsStatusHint: 'moving' | 'idle' | 'paused' | undefined (just refresh dot)
+ * gpsStatusHint: 'moving' | 'traffic' | 'idle' | 'paused' | undefined (just refresh dot)
  */
 function updateStickyStrip(gpsStatusHint) {
     const strip = document.getElementById('stickyStrip');
@@ -366,6 +374,8 @@ function updateStickyStrip(gpsStatusHint) {
             stripStatus.textContent = 'Shift active · GPS off';
         } else if (gpsStatusHint === 'moving') {
             stripStatus.textContent = 'Broadcasting · Moving';
+        } else if (gpsStatusHint === 'traffic') {
+            stripStatus.textContent = 'Broadcasting · In traffic';
         } else if (gpsStatusHint === 'idle') {
             stripStatus.textContent = 'Broadcasting · Idle';
         } else if (gpsStatusHint === 'paused') {
