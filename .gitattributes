@@ -1,5 +1,11 @@
 * text=auto eol=lf
 
+*.blade.php linguist-language=Blade
+*.php linguist-language=PHP
+*.css linguist-language=CSS
+*.js linguist-language=JavaScript
+*.html linguist-language=HTML
+
 *.blade.php diff=html
 *.css diff=css
 *.html diff=html
