@@ -7,6 +7,7 @@ import { initDriverDashboard }  from "./modules/driver-dashboard";
 import { initAdminDashboard }   from "./modules/admin-dashboard";
 import { initAnnouncements }    from "./modules/announcements";
 import { initStudentPasswordModal } from "./modules/student";
+import { initAccessRevocation }    from "./modules/access-control";
 
 document.addEventListener("DOMContentLoaded", () => {
     const app  = document.getElementById("app");
@@ -16,6 +17,8 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("Echo not initialized");
         return;
     }
+
+    initAccessRevocation();
 
     switch (page) {
         case "tracking":

@@ -532,11 +532,12 @@ async function loadAnalytics() {
     if (!charts) return;
 
     const maxDay = Math.max(...data.shifts_per_day.map(d => d.count), 1);
-    const total  = (data.manual_ended_month || 0) + (data.logout_ended_month || 0) + (data.auto_ended_month || 0);
+    const total  = (data.manual_ended_month || 0) + (data.logout_ended_month || 0) + (data.auto_ended_month || 0) + (data.deactivated_ended_month || 0);
     const pct    = n => total ? Math.round((n / total) * 100) : 0;
     const pM     = pct(data.manual_ended_month);
     const pL     = pct(data.logout_ended_month);
     const pA     = pct(data.auto_ended_month);
+    const pD     = pct(data.deactivated_ended_month);
 
     charts.innerHTML = `
         <div class="analytics-card">
@@ -555,11 +556,12 @@ async function loadAnalytics() {
             ${total === 0
                 ? '<p style="font-size:12px;color:#9CA3AF;padding-top:8px;">No completed shifts this month.</p>'
                 : `<div style="display:flex;align-items:center;gap:20px;padding-top:8px;">
-                    <div class="donut" style="background:conic-gradient(#002D62 0% ${pM}%, #378ADD ${pM}% ${pM+pL}%, #E64A19 ${pM+pL}% 100%);"></div>
+                    <div class="donut" style="background:conic-gradient(#002D62 0% ${pM}%, #378ADD ${pM}% ${pM+pL}%, #E64A19 ${pM+pL}% ${pM+pL+pA}%, #991B1B ${pM+pL+pA}% 100%);"></div>
                     <div>
                         <div class="legend-row"><span class="legend-dot" style="background:#002D62;"></span>Manual — ${data.manual_ended_month} (${pM}%)</div>
                         <div class="legend-row"><span class="legend-dot" style="background:#378ADD;"></span>Logout — ${data.logout_ended_month} (${pL}%)</div>
                         <div class="legend-row"><span class="legend-dot" style="background:#E64A19;"></span>Auto-ended — ${data.auto_ended_month} (${pA}%)</div>
+                        <div class="legend-row"><span class="legend-dot" style="background:#991B1B;"></span>Account deactivated — ${data.deactivated_ended_month} (${pD}%)</div>
                     </div>
                    </div>`}
         </div>`;
@@ -1183,6 +1185,7 @@ function endReasonBadge(reason) {
         manual: ['#D1FAE5', '#065F46', 'Manual'],
         logout: ['#DBEAFE', '#1E40AF', 'Logout'],
         auto:   ['#FEF3C7', '#92400E', 'Auto-ended'],
+        account_deactivated: ['#FEE2E2', '#991B1B', 'Account deactivated'],
     };
     const [bg, color, label] = map[reason] ?? ['#eee', '#555', reason];
     return `<span class="badge" style="background:${bg};color:${color};">${escapeHtml(label)}</span>`;

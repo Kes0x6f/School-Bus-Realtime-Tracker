@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // ↓ Add this alias so ->middleware('role:driver') works
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureRole::class,
+            'active' => \App\Http\Middleware\EnsureAccountIsActive::class,
         ]);
         $middleware->append(\App\Http\Middleware\AddContentSecurityPolicy::class);
     })

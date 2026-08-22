@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ShiftEndReason;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
@@ -52,10 +53,14 @@ class Shift extends Model
      * Write a completed shift record.
      * Call this at every shift-ending point before updating the vehicle row.
      *
-     * end_reason: 'manual' | 'logout' | 'auto'
+     * end_reason: 'manual' | 'logout' | 'auto' | 'account_deactivated'
      */
-    public static function log(Vehicle $vehicle, string $endReason): self
+    public static function log(Vehicle $vehicle, ShiftEndReason|string $endReason): self
     {
+        $endReason = $endReason instanceof ShiftEndReason
+            ? $endReason->value
+            : ShiftEndReason::from($endReason)->value;
+
         return self::create([
             'vehicle_id'       => $vehicle->id,
             'user_id'          => $vehicle->user_id,

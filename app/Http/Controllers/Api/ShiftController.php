@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\ShiftEndReason;
 use App\Http\Controllers\Controller;
 use App\Enums\VehicleRoute;
 use App\Http\Requests\StartShiftRequest;
-use App\Models\Shift;
 use App\Models\Vehicle;
 use App\Events\VehicleStatusChanged;
+use App\Services\ShiftCompletionService;
 use Illuminate\Support\Facades\Auth;
 
 class ShiftController extends Controller
@@ -63,7 +64,7 @@ class ShiftController extends Controller
     /**
      * POST /driver/shift/end
      */
-    public function end(Request $request)
+    public function end(ShiftCompletionService $shiftCompletion)
     {
         $vehicle = Vehicle::where('user_id', Auth::id())->firstOrFail();
 
@@ -74,16 +75,14 @@ class ShiftController extends Controller
             ], 422);
         }
 
-        Shift::log($vehicle, 'manual');
+        $vehicle = $shiftCompletion->complete($vehicle, ShiftEndReason::MANUAL);
 
-        $vehicle->update([
-            'shift_active'   => false,
-            'shift_ended_at' => now(),
-            'is_active'      => false,
-        ]);
-
-        $vehicle->refresh();
-        broadcast(new VehicleStatusChanged($vehicle));
+        if (!$vehicle) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No active shift to end.',
+            ], 422);
+        }
 
         return response()->json([
             'status'  => 'success',

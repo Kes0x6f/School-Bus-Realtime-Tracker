@@ -21,7 +21,7 @@ Route::middleware('throttle:60,1')->group(function () {
 // The frontend sends cookies + CSRF headers (credentials: 'same-origin').
 // We include the 'web' middleware group so the session is started and
 // auth()->user() resolves correctly — no Sanctum needed.
-Route::middleware(['web', 'auth'])->group(function () {
+Route::middleware(['web', 'auth', 'active'])->group(function () {
 
     // ── Driver-only mutations ─────────────────────────────────────────────────
     Route::middleware('role:driver')->group(function () {

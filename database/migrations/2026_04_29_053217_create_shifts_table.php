@@ -19,6 +19,7 @@ return new class extends Migration
             // manual  → driver pressed "End Shift"
             // logout  → driver logged out while shift was active
             // auto    → CheckInactiveVehicles cron auto-ended after 20 min no GPS
+            // account_deactivated → admin deactivated the assigned driver
             $table->string('end_reason')->nullable();
             $table->timestamps();
 

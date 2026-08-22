@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Enums\VehicleRoute;
+use App\Enums\ShiftEndReason;
+use App\Events\UserAccessRevoked;
 use App\Models\Shift;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Events\VehicleStatusChanged;
+use App\Services\ShiftCompletionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
@@ -77,13 +79,46 @@ class AdminController extends Controller
         return response()->json(['status' => 'success', 'user' => $user->fresh()]);
     }
 
-    public function deactivateUser(User $user)
+    public function deactivateUser(User $user, ShiftCompletionService $shiftCompletion)
     {
         if ($user->id === auth()->id()) {
             return response()->json(['status' => 'error', 'message' => 'Cannot deactivate yourself.'], 422);
         }
 
-        $user->update(['is_active' => false]);
+        $completedVehicle = null;
+
+        DB::transaction(function () use ($user, $shiftCompletion, &$completedVehicle): void {
+            $target = User::query()->lockForUpdate()->findOrFail($user->id);
+            $target->update(['is_active' => false]);
+
+            // Notify any already-connected browser before its database
+            // session is removed. The server-side middleware remains the
+            // security boundary if the client does not disconnect promptly.
+            broadcast(new UserAccessRevoked($target->id));
+
+            if ($target->role === 'driver') {
+                $vehicle = Vehicle::query()
+                    ->where('user_id', $target->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($vehicle?->shift_active) {
+                    $completedVehicle = $shiftCompletion->completeWithinTransaction(
+                        $vehicle,
+                        ShiftEndReason::ACCOUNT_DEACTIVATED,
+                    );
+                }
+            }
+
+            DB::connection(config('session.connection') ?: config('database.default'))
+                ->table(config('session.table', 'sessions'))
+                ->where('user_id', $target->id)
+                ->delete();
+        });
+
+        // VehicleStatusChanged must only be emitted after the deactivation
+        // transaction commits, so clients never see a rolled-back shift end.
+        $shiftCompletion->broadcastStatus($completedVehicle);
 
         return response()->json(['status' => 'success']);
     }
@@ -296,6 +331,9 @@ class AdminController extends Controller
             'auto_ended_month'   => (clone $monthShifts)->where('end_reason', 'auto')->count(),
             'manual_ended_month' => (clone $monthShifts)->where('end_reason', 'manual')->count(),
             'logout_ended_month' => (clone $monthShifts)->where('end_reason', 'logout')->count(),
+            'deactivated_ended_month' => (clone $monthShifts)
+                ->where('end_reason', ShiftEndReason::ACCOUNT_DEACTIVATED->value)
+                ->count(),
             'shifts_per_day'     => $days,
             'total_vehicles'     => Vehicle::count(),
             'total_drivers'      => User::where('role', 'driver')->where('is_active', true)->count(),

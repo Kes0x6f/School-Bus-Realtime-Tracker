@@ -7,13 +7,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\RateLimiter;
-use App\Models\Shift;
 use App\Models\Vehicle;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\AnnouncementController;
-use App\Events\VehicleStatusChanged;
+use App\Enums\ShiftEndReason;
+use App\Services\ShiftCompletionService;
 
-Broadcast::routes(['middleware' => ['web']]);
+Broadcast::routes(['middleware' => ['web', 'auth', 'active']]);
 
 require base_path('routes/channels.php');
 
@@ -61,6 +61,8 @@ Route::post('/login', function (Request $request) {
 
         if (!Auth::user()->is_active) {
             Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
             return redirect()->route('login')
                 ->withErrors(['email' => 'Your account has been deactivated.'])
                 ->withInput($request->only('email'));
@@ -83,7 +85,7 @@ Route::post('/login', function (Request $request) {
         ->withInput($request->only('email'));
 });
 
-Route::post('/logout', function (Request $request) {
+Route::post('/logout', function (Request $request, ShiftCompletionService $shiftCompletion) {
     $user = Auth::user();
 
     // ── Auto-end shift on driver logout ───────────────────────────────────────
@@ -95,16 +97,7 @@ Route::post('/logout', function (Request $request) {
                           ->first();
 
         if ($vehicle) {
-            Shift::log($vehicle, 'logout');
-
-            $vehicle->update([
-                'shift_active'   => false,
-                'shift_ended_at' => now(),
-                'is_active'      => false,
-            ]);
-
-            $vehicle->refresh();
-            broadcast(new VehicleStatusChanged($vehicle));
+            $shiftCompletion->complete($vehicle, ShiftEndReason::LOGOUT);
         }
     }
 
@@ -120,7 +113,7 @@ Route::post('/logout', function (Request $request) {
 
 // ─── Driver ───────────────────────────────────────────────────────────────────
 
-Route::middleware(['auth', 'role:driver'])->group(function () {
+Route::middleware(['auth', 'active', 'role:driver'])->group(function () {
     Route::get('/driver/dashboard', function () {
         $vehicle = auth()->user()->vehicle;
         if (!$vehicle) abort(403, 'No vehicle assigned to this driver.');
@@ -136,7 +129,7 @@ Route::middleware(['auth', 'role:driver'])->group(function () {
 
 // ─── Student ──────────────────────────────────────────────────────────────────
 
-Route::middleware(['auth', 'role:student,admin'])->group(function () {
+Route::middleware(['auth', 'active', 'role:student,admin'])->group(function () {
     Route::get('/student/active-jeeps',     [StudentController::class, 'active']);
     Route::get('/student/track/{id}',       [StudentController::class, 'track']);
     Route::post('/student/change-password', [StudentController::class, 'changePassword']);
@@ -144,7 +137,7 @@ Route::middleware(['auth', 'role:student,admin'])->group(function () {
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
-Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
+Route::middleware(['auth', 'active', 'role:admin'])->prefix('admin')->group(function () {
     Route::get('/dashboard', [AdminController::class, 'index']);
 
     Route::get( '/api/users',                              [AdminController::class, 'users']);

@@ -2,9 +2,10 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Shift;
 use App\Models\Vehicle;
 use App\Events\VehicleStatusChanged;
+use App\Services\ShiftCompletionService;
+use App\Enums\ShiftEndReason;
 use Illuminate\Console\Command;
 
 class CheckInactiveVehicles extends Command
@@ -15,7 +16,7 @@ class CheckInactiveVehicles extends Command
     const GPS_STALE_SECONDS      = 180;  // 3 minutes
     const SHIFT_AUTO_END_SECONDS = 1200; // 20 minutes
 
-    public function handle()
+    public function handle(ShiftCompletionService $shiftCompletion)
     {
         \Log::info('[CheckInactiveVehicles] Running', ['time' => now()]);
 
@@ -51,16 +52,7 @@ class CheckInactiveVehicles extends Command
                     'seconds_since' => $secondsSinceUpdate,
                 ]);
 
-                Shift::log($vehicle, 'auto');
-
-                $vehicle->update([
-                    'shift_active'   => false,
-                    'shift_ended_at' => now(),
-                    'is_active'      => false,
-                ]);
-
-                $vehicle->refresh();
-                broadcast(new VehicleStatusChanged($vehicle));
+                $shiftCompletion->complete($vehicle, ShiftEndReason::AUTO);
                 continue;
             }
 

@@ -21,6 +21,22 @@
 
             <p class="title" style="margin-top: 16px;">Login</p>
 
+            @if (request()->boolean('deactivated'))
+                <div style="
+                    width: 100%;
+                    background: #fef2f2;
+                    border: 1px solid #fca5a5;
+                    border-radius: 10px;
+                    padding: 12px 16px;
+                    margin-bottom: 12px;
+                    color: #dc2626;
+                    font-size: 13px;
+                    font-weight: 600;
+                ">
+                    Your account has been deactivated.
+                </div>
+            @endif
+
             @if ($errors->any())
                 <div style="
                     width: 100%;
