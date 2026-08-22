@@ -14,6 +14,8 @@
  *                   Pass null/undefined to show all (active-jeeps page).
  */
 
+import { escapeHtml } from './dom';
+
 const STORAGE_KEY = 'dismissed_announcements';
 
 function getDismissed() {
@@ -23,7 +25,6 @@ function getDismissed() {
         return [];
     }
 }
-
 function markDismissed(id) {
     const dismissed = getDismissed();
     if (!dismissed.includes(id)) {
@@ -107,7 +108,9 @@ function showAnnouncement(announcement, routeFilter) {
     if (!stack) return;
 
     const isRouteSpecific = !!announcement.route;
-    const scopeLabel = isRouteSpecific ? `${announcement.route}` : 'All routes';
+    const scopeLabel = isRouteSpecific
+        ? escapeHtml(String(announcement.route))
+        : 'All routes';
 
     const el = document.createElement('div');
     el.id = `announcement-${announcement.id}`;
@@ -151,10 +154,3 @@ function removeAnnouncement(id) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function escapeHtml(str) {
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}

@@ -26,7 +26,7 @@
 
     {{-- SETTINGS ICON — top right, subtle gear --}}
     <button
-        onclick="document.getElementById('studentPwOverlay').classList.remove('hidden')"
+        data-open-student-settings
         aria-label="Account settings"
         style="position:absolute;
                top:16px;
@@ -188,7 +188,7 @@
 
     <!-- Logout -->
     <a href="/logout"
-       onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+       data-logout-link
        style="display:block;text-align:center;margin-top:12px;
               font-size:13px;color:#999;text-decoration:none;padding:8px;">
         Logout
@@ -204,7 +204,7 @@
             <div class="modal-header">
                 <h2 class="modal-title">Account Settings</h2>
                 <button class="modal-close"
-                        onclick="document.getElementById('studentPwOverlay').classList.add('hidden')">
+                        data-close-student-settings>
                     ✕
                 </button>
             </div>
@@ -248,7 +248,6 @@
                 </p>
 
                 <button id="spwSubmitBtn"
-                        onclick="submitStudentPasswordChange()"
                         style="background:#002D62;color:#fff;border:none;
                                padding:12px;border-radius:10px;font-size:14px;
                                font-weight:600;cursor:pointer;width:100%;

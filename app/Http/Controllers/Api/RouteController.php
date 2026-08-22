@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\UpdateRouteRequest;
 use App\Models\Vehicle;
 use App\Events\VehicleStatusChanged;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class RouteController extends Controller
@@ -22,11 +22,9 @@ class RouteController extends Controller
      *
      * POST /api/driver/route
      */
-    public function update(Request $request)
+    public function update(UpdateRouteRequest $request)
     {
-        $validated = $request->validate([
-            'route_name' => 'required|string|max:255',
-        ]);
+        $validated = $request->validated();
 
         $vehicle = Vehicle::where('user_id', Auth::id())->firstOrFail();
 

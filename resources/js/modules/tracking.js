@@ -796,13 +796,15 @@ function hideBanner(id) {
  * type:     'success' | 'info' | 'danger' | 'warning'
  * duration: ms before auto-dismiss (default 4500)
  */
-function showToast(message, type = 'info', duration = 4500) {
+/* function showToastLegacy(message, type = 'info', duration = 4500) {
+    return showToast(message, type, duration);
+
     const stack = document.getElementById('toastStack');
     if (!stack) return;
 
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    toast.innerHTML = `
+    toast.textContent = `
         <span class="toast-msg">${message}</span>
         <button class="toast-close" aria-label="Dismiss">✕</button>
     `;
@@ -813,12 +815,39 @@ function showToast(message, type = 'info', duration = 4500) {
     requestAnimationFrame(() => toast.classList.add('toast-visible'));
 
     setTimeout(() => dismissToast(toast), duration);
-}
+} */
 
 function dismissToast(toast) {
     toast.classList.remove('toast-visible');
     toast.classList.add('toast-exit');
     setTimeout(() => toast.remove(), 350);
+}
+
+// Keep toast content as a text node. Route names and other event data are
+// untrusted even when they came from an authenticated driver.
+function showToast(message, type = 'info', duration = 4500) {
+    const stack = document.getElementById('toastStack');
+    if (!stack) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+
+    const messageElement = document.createElement('span');
+    messageElement.className = 'toast-msg';
+    messageElement.textContent = message;
+
+    const closeButton = document.createElement('button');
+    closeButton.className = 'toast-close';
+    closeButton.type = 'button';
+    closeButton.setAttribute('aria-label', 'Dismiss');
+    closeButton.textContent = '\u00D7';
+
+    toast.append(messageElement, closeButton);
+    closeButton.addEventListener('click', () => dismissToast(toast));
+    stack.appendChild(toast);
+
+    requestAnimationFrame(() => toast.classList.add('toast-visible'));
+    setTimeout(() => dismissToast(toast), duration);
 }
 
 // ─── Shift-ended overlay ──────────────────────────────────────────────────────

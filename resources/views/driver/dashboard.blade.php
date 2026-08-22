@@ -1,6 +1,8 @@
 @extends('layouts.app')
 
 @section('content')
+
+@php($routes = \App\Enums\VehicleRoute::cases())
 <div id="app"
      class="driver-page"
      data-page="driver-dashboard"
@@ -57,18 +59,11 @@
 
             <select id="routeSelect" class="input">
                 <option value="">— Select route —</option>
-                <option value="Route A – Mangaldan"
-                    {{ $vehicle->route_name === 'Route A – Mangaldan'  ? 'selected' : '' }}>
-                    Route A – Mangaldan
-                </option>
-                <option value="Route B – Calasiao"
-                    {{ $vehicle->route_name === 'Route B – Calasiao'   ? 'selected' : '' }}>
-                    Route B – Calasiao
-                </option>
-                <option value="Route C – San Fabian"
-                    {{ $vehicle->route_name === 'Route C – San Fabian' ? 'selected' : '' }}>
-                    Route C – San Fabian
-                </option>
+                @foreach($routes as $route)
+                    <option value="{{ $route->value }}" {{ $vehicle->route_name === $route->value ? 'selected' : '' }}>
+                        {{ $route->value }}
+                    </option>
+                @endforeach
             </select>
             {{-- JS inserts #routeSavedHint after the select --}}
         </div>

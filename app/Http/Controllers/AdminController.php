@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\VehicleRoute;
 use App\Models\Shift;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -9,6 +10,7 @@ use App\Events\VehicleStatusChanged;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rules\Enum;
 
 class AdminController extends Controller
 {
@@ -166,7 +168,7 @@ class AdminController extends Controller
     {
         $validated = $request->validate([
             'plate_number' => 'required|string|max:20|unique:vehicles,plate_number',
-            'route_name'   => 'nullable|string|max:255',
+            'route_name'   => ['nullable', new Enum(VehicleRoute::class)],
         ]);
 
         $vehicle = Vehicle::create($validated);
@@ -178,7 +180,7 @@ class AdminController extends Controller
     {
         $validated = $request->validate([
             'plate_number' => 'required|string|max:20|unique:vehicles,plate_number,' . $vehicle->id,
-            'route_name'   => 'nullable|string|max:255',
+            'route_name'   => ['nullable', new Enum(VehicleRoute::class)],
         ]);
 
         $vehicle->update($validated);

@@ -1,7 +1,9 @@
 @extends('layouts.app')
 
 @section('content')
-<div id="app" data-page="admin-dashboard">
+<div id="app"
+     data-page="admin-dashboard"
+     data-routes='@json(\App\Enums\VehicleRoute::values())'>
 
   {{-- TOP BAR --}}
   <div class="admin-topbar">

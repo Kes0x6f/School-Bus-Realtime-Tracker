@@ -10,8 +10,8 @@ const CSRF = () =>
 // ─── Password change modal ────────────────────────────────────────────────────
 
 /**
- * Called by the inline onclick on the submit button inside the modal.
- * Global function so the blade template can call it without importing.
+ * Exposed for the shared modal handler below and for backwards compatibility
+ * with pages that may still reference the function during a rolling deploy.
  */
 window.submitStudentPasswordChange = async function () {
     const current   = document.getElementById('spwCurrent')?.value   ?? '';
@@ -126,6 +126,27 @@ export function initStudentPasswordModal() {
     const hintEl       = document.getElementById('spwHint');
 
     if (!confirmInput || !newInput || !hintEl) return;
+
+    document.querySelectorAll('[data-open-student-settings]').forEach(button => {
+        button.addEventListener('click', () => {
+            document.getElementById('studentPwOverlay')?.classList.remove('hidden');
+        });
+    });
+
+    document.querySelectorAll('[data-close-student-settings]').forEach(button => {
+        button.addEventListener('click', () => {
+            document.getElementById('studentPwOverlay')?.classList.add('hidden');
+            resetStudentPwModal();
+        });
+    });
+
+    document.getElementById('spwSubmitBtn')
+        ?.addEventListener('click', () => window.submitStudentPasswordChange());
+
+    document.querySelector('[data-logout-link]')?.addEventListener('click', event => {
+        event.preventDefault();
+        document.getElementById('logout-form')?.submit();
+    });
 
     confirmInput.addEventListener('input', () => {
         if (!confirmInput.value) { hintEl.textContent = ''; return; }

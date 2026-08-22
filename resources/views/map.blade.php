@@ -13,32 +13,11 @@
     <style>
     #map { height: 400px; }
     </style>
-@vite(['resources/js/app.js'])
+@vite(['resources/js/modules/map-demo.js'])
 </head>
 <body>
     <h1>Vehicle Tracking</h1>
      <div id="map"></div>
-     <button onclick="resetMarker()">create marker</button>
+     <button id="resetMarkerButton" type="button">create marker</button>
 </body>
-<script>
-var map = L.map('map').setView([16.051011533751666, 120.3407345106514], 13);
-window.map = map;
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-}).addTo(map);
-
-var marker = L.marker([16.051011533751666, 120.3407345106514]).addTo(map);
-
-function resetMarker(){
-    marker.setLatLng([16.051021533751666, 120.3407345106514]);
-    map.panTo([16.051021533751666, 120.3407345106514]);
-}
-
-function moveMarker(lat, long){
-    marker.setLatLng([lat, long]);
-    map.panTo([lat, long]);
-}
-window.marker = marker;
-</script>
 </html>

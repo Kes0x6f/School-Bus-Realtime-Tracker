@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\VehicleRoute;
 use App\Http\Controllers\Controller;
 use App\Models\Announcement;
 use App\Events\AnnouncementBroadcast;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rules\Enum;
 
 class AnnouncementController extends Controller
 {
@@ -40,7 +42,7 @@ class AnnouncementController extends Controller
     {
         $validated = $request->validate([
             'message'    => 'required|string|max:300',
-            'route'      => 'nullable|string|max:100',
+            'route'      => ['nullable', new Enum(VehicleRoute::class)],
             'expires_at' => 'nullable|date|after:now',
         ]);
 

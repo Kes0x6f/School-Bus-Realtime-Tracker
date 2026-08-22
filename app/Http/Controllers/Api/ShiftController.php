@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Enums\VehicleRoute;
+use App\Http\Requests\StartShiftRequest;
 use App\Models\Shift;
 use App\Models\Vehicle;
 use App\Events\VehicleStatusChanged;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ShiftController extends Controller
@@ -18,11 +19,9 @@ class ShiftController extends Controller
      * active-jeeps card shows the correct route immediately on shift start,
      * not the stale route_name from the previous shift.
      */
-    public function start(Request $request)
+    public function start(StartShiftRequest $request)
     {
-        $validated = $request->validate([
-            'route_name' => 'nullable|string|max:255',
-        ]);
+        $validated = $request->validated();
 
         $vehicle = Vehicle::where('user_id', Auth::id())->firstOrFail();
 
@@ -39,7 +38,10 @@ class ShiftController extends Controller
             'shift_ended_at'   => null,
             'is_active'        => false,
             'last_moved_at'    => null,   // reset so idle/traffic clock starts fresh
-            'route_name'       => $validated['route_name'] ?? $vehicle->route_name,
+            // Do not carry a legacy/unapproved value forward when a driver
+            // starts a shift without selecting a route.
+            'route_name'       => $validated['route_name']
+                ?? VehicleRoute::tryFrom((string) $vehicle->route_name)?->value,
         ]);
 
         $vehicle->refresh();

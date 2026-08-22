@@ -14,6 +14,13 @@
  *   private channel `vehicle.{id}` — per-vehicle location updates (initial list)
  */
 
+function createTextElement(tagName, className, text) {
+    const element = document.createElement(tagName);
+    if (className) element.className = className;
+    element.textContent = text;
+    return element;
+}
+
 export function initActiveJeeps() {
     const container = document.getElementById("vehicleList");
     if (!container || !window.Echo) return;
@@ -80,7 +87,7 @@ function addVehicle(container, vehicle) {
     const operator = vehicle.user?.name ?? 'Unknown';
     const route    = vehicle.route_name ?? 'N/A';
 
-    a.innerHTML = buildCardInnerHTML(route, operator, vehicle.is_full, vehicle.gps_status, vehicle.last_seen);
+    a.appendChild(createCardContent(route, operator, vehicle.is_full, vehicle.gps_status, vehicle.last_seen));
 
     container.appendChild(a);
 
@@ -190,25 +197,38 @@ function resolveStatusStyle(gpsStatus, lastSeen) {
     }
 }
 
-function buildCardInnerHTML(route, operator, isFull, gpsStatus, lastSeen) {
+function createCardContent(route, operator, isFull, gpsStatus, lastSeen) {
     const { bgColor, textColor, label } = resolveStatusStyle(gpsStatus, lastSeen);
 
-    return `
-        <p class="jeepRoute">Route: ${route}</p>
-        <p class="jeepDetail">Operator: ${operator}</p>
-        <div class="statusRow">
-            <div class="statusBadge" style="background-color: ${bgColor};">
-                <p class="statusText" style="color: ${textColor}; font-size: 11px; font-weight: bold;">
-                    ${label}
-                </p>
-            </div>
-            <div class="statusBadge occupancyBadge" style="background-color: #FFD54F;">
-                <p style="color: #E65100; font-size: 11px; font-weight: bold;">
-                    ${isFull ? 'FULL' : 'SEATS AVAILABLE'}
-                </p>
-            </div>
-        </div>
-    `;
+    const fragment = document.createDocumentFragment();
+    fragment.appendChild(createTextElement('p', 'jeepRoute', `Route: ${route}`));
+    fragment.appendChild(createTextElement('p', 'jeepDetail', `Operator: ${operator}`));
+
+    const statusRow = document.createElement('div');
+    statusRow.className = 'statusRow';
+
+    const statusBadge = document.createElement('div');
+    statusBadge.className = 'statusBadge';
+    statusBadge.style.backgroundColor = bgColor;
+    const statusText = createTextElement('p', 'statusText', label);
+    statusText.style.color = textColor;
+    statusText.style.fontSize = '11px';
+    statusText.style.fontWeight = 'bold';
+    statusBadge.appendChild(statusText);
+
+    const occupancyBadge = document.createElement('div');
+    occupancyBadge.className = 'statusBadge occupancyBadge';
+    occupancyBadge.style.backgroundColor = isFull ? '#E53935' : '#FFD54F';
+    const occupancyText = createTextElement('p', '', isFull ? 'FULL' : 'SEATS AVAILABLE');
+    occupancyText.style.color = isFull ? '#fff' : '#E65100';
+    occupancyText.style.fontSize = '11px';
+    occupancyText.style.fontWeight = 'bold';
+    occupancyBadge.appendChild(occupancyText);
+
+    statusRow.append(statusBadge, occupancyBadge);
+    fragment.appendChild(statusRow);
+
+    return fragment;
 }
 
 /**

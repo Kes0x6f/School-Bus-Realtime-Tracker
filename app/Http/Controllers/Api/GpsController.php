@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Http\Requests\UpdateGpsRequest;
 use App\Models\Vehicle;
 use App\Events\VehicleLocationUpdated;
 use App\Events\VehicleStatusChanged;
@@ -22,15 +22,9 @@ class GpsController extends Controller
      * it is only used as a consistency check — if it doesn't match the
      * driver's assigned vehicle, we reject the request with 403.
      */
-    public function update(Request $request)
+    public function update(UpdateGpsRequest $request)
     {
-        $validated = $request->validate([
-            'vehicle_id' => 'required|exists:vehicles,id',
-            'latitude'   => 'required|numeric',
-            'longitude'  => 'required|numeric',
-            'speed'      => 'nullable|numeric',
-            'route_name' => 'nullable|string',
-        ]);
+        $validated = $request->validated();
 
         // Resolve vehicle from the authenticated driver — not from the request.
         $vehicle = Vehicle::where('user_id', Auth::id())->firstOrFail();
@@ -59,7 +53,6 @@ class GpsController extends Controller
             'speed'      => $validated['speed'] ?? null,
             'last_seen'  => now(),
             'is_active'  => true,
-            'route_name' => $validated['route_name'] ?? $vehicle->route_name,
         ];
 
         // Stamp last_moved_at whenever the jeep is clearly rolling.

@@ -5,6 +5,8 @@
  * Each tab fetches its own data lazily on first activation.
  */
 
+import { escapeHtml } from './dom';
+
 const CSRF = () => document.querySelector('meta[name="csrf-token"]').content;
 
 const loaded = { 'live-map': false, users: false, vehicles: false, shifts: false, analytics: false };
@@ -34,7 +36,6 @@ function initTabs() {
         btn.addEventListener('click', () => activateTab(btn.dataset.tab));
     });
 }
-
 function activateTab(name) {
     document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
     document.querySelectorAll('.admin-panel').forEach(p => p.classList.toggle('hidden', p.id !== `panel-${name}`));
@@ -133,9 +134,20 @@ function placeOrUpdateMarker(v) {
         markers[v.id].setLatLng([v.latitude, v.longitude]).setIcon(icon);
     } else {
         markers[v.id] = L.marker([v.latitude, v.longitude], { icon })
-            .bindPopup(`<strong>${v.plate_number ?? 'Vehicle ' + v.id}</strong><br>${v.route_name ?? '—'}<br>${v.user?.name ?? '—'}`)
+            .bindPopup(createVehiclePopup(v))
             .addTo(adminMap);
     }
+}
+function createVehiclePopup(v) {
+    const popup = document.createElement('div');
+    const plate = document.createElement('strong');
+    plate.textContent = v.plate_number ?? `Vehicle ${v.id}`;
+    popup.appendChild(plate);
+    popup.appendChild(document.createElement('br'));
+    popup.appendChild(document.createTextNode(v.route_name ?? '—'));
+    popup.appendChild(document.createElement('br'));
+    popup.appendChild(document.createTextNode(v.user?.name ?? '—'));
+    return popup;
 }
 
 function removeMarker(id) {
@@ -160,8 +172,8 @@ function renderSidebar(activeVehicles) {
         return `
             <div class="sidebar-vrow" data-id="${v.id}" style="cursor:pointer;">
                 <div>
-                    <div class="sidebar-vname">${v.plate_number ?? 'Vehicle ' + v.id}</div>
-                    <div class="sidebar-vsub">${v.route_name ?? '—'} · ${v.user?.name ?? '—'}</div>
+                    <div class="sidebar-vname">${escapeHtml(v.plate_number ?? 'Vehicle ' + v.id)}</div>
+                    <div class="sidebar-vsub">${escapeHtml(v.route_name ?? '—')} · ${escapeHtml(v.user?.name ?? '—')}</div>
                 </div>
                 <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0;"></span>
             </div>`;
@@ -226,12 +238,12 @@ function renderUsersTable() {
                     <tr data-user-id="${u.id}">
                         <td>
                             <span class="admin-avatar" style="background:${avatarBg(u.role)};color:${avatarColor(u.role)};">
-                                ${initials(u.name)}
-                            </span>${u.name}
+                                ${escapeHtml(initials(u.name))}
+                            </span>${escapeHtml(u.name)}
                         </td>
-                        <td class="muted">${u.email}</td>
+                        <td class="muted">${escapeHtml(u.email)}</td>
                         <td>${roleBadge(u.role)}</td>
-                        <td>${u.vehicle ? u.vehicle.plate_number : '<span class="muted">—</span>'}</td>
+                        <td>${u.vehicle ? escapeHtml(u.vehicle.plate_number) : '<span class="muted">—</span>'}</td>
                         <td>${u.is_active
                             ? '<span class="badge b-green">Active</span>'
                             : '<span class="badge b-red">Inactive</span>'}</td>
@@ -365,12 +377,12 @@ function renderVehicleCards() {
     grid.innerHTML = allVehicles.map(v => `
         <div class="admin-vcard" data-vehicle-id="${v.id}">
             <div class="admin-vcard-header">
-                <span class="admin-plate">${v.plate_number}</span>
+                <span class="admin-plate">${escapeHtml(v.plate_number)}</span>
                 ${gpsStatusBadge(v.gps_status)}
             </div>
             <div class="admin-vcard-body">
-                <div><div class="vfield-lbl">Assigned driver</div><div class="vfield-val">${v.user?.name ?? '<span class="muted">Unassigned</span>'}</div></div>
-                <div><div class="vfield-lbl">Route</div><div class="vfield-val">${v.route_name ?? '<span class="muted">—</span>'}</div></div>
+                <div><div class="vfield-lbl">Assigned driver</div><div class="vfield-val">${v.user?.name ? escapeHtml(v.user.name) : '<span class="muted">Unassigned</span>'}</div></div>
+                <div><div class="vfield-lbl">Route</div><div class="vfield-val">${v.route_name ? escapeHtml(v.route_name) : '<span class="muted">—</span>'}</div></div>
                 <div><div class="vfield-lbl">Last seen</div><div class="vfield-val">${v.last_seen ? formatTimeAgo(v.last_seen) : '<span class="muted">—</span>'}</div></div>
                 <div><div class="vfield-lbl">Capacity</div><div class="vfield-val">${v.shift_active ? (v.is_full ? 'Full' : 'Available') : '<span class="muted">—</span>'}</div></div>
             </div>
@@ -487,9 +499,9 @@ function renderShiftsTable(shifts) {
             <tbody>
                 ${shifts.map(s => `
                     <tr>
-                        <td>${s.driver}</td>
-                        <td>${s.plate}</td>
-                        <td>${s.route}</td>
+                        <td>${escapeHtml(s.driver)}</td>
+                        <td>${escapeHtml(s.plate)}</td>
+                        <td>${escapeHtml(s.route)}</td>
                         <td class="muted">${formatDatetime(s.started_at)}</td>
                         <td class="muted">${s.ended_at
                             ? formatDatetime(s.ended_at)
@@ -640,9 +652,9 @@ function openEditUserModal(user) {
         </div>
         <form class="modal-form">
             <label class="modal-label">Name</label>
-            <input class="modal-input" name="name" value="${user.name}" required>
+            <input class="modal-input" name="name" value="${escapeHtml(user.name)}" required>
             <label class="modal-label">Email</label>
-            <input class="modal-input" name="email" type="email" value="${user.email}" required>
+            <input class="modal-input" name="email" type="email" value="${escapeHtml(user.email)}" required>
             <label class="modal-label">Role</label>
             <select class="modal-input" name="role">
                 <option value="student" ${user.role === 'student' ? 'selected' : ''}>Student</option>
@@ -661,7 +673,7 @@ function openEditUserModal(user) {
 function openAssignVehicleModal(user) {
     openModal(`
         <div class="modal-header">
-            <h2 class="modal-title">Assign vehicle to ${user.name}</h2>
+            <h2 class="modal-title">Assign vehicle to ${escapeHtml(user.name)}</h2>
             <button class="modal-close">✕</button>
         </div>
         <form class="modal-form">
@@ -670,7 +682,7 @@ function openAssignVehicleModal(user) {
                 <option value="">— Select vehicle —</option>
                 ${allVehicles.map(v => `
                     <option value="${v.id}" ${v.user_id === user.id ? 'selected' : ''}>
-                        ${v.plate_number}${v.user_id && v.user_id !== user.id ? ' (currently assigned)' : ''}
+                        ${escapeHtml(v.plate_number)}${v.user_id && v.user_id !== user.id ? ' (currently assigned)' : ''}
                     </option>`).join('')}
             </select>
             <p style="font-size:11px;color:#9CA3AF;margin-top:4px;">
@@ -713,9 +725,9 @@ function openEditVehicleModal(v) {
         </div>
         <form class="modal-form">
             <label class="modal-label">Plate number</label>
-            <input class="modal-input" name="plate_number" value="${v.plate_number}" required>
+            <input class="modal-input" name="plate_number" value="${escapeHtml(v.plate_number)}" required>
             <label class="modal-label">Route</label>
-            <input class="modal-input" name="route_name" value="${v.route_name ?? ''}">
+            <input class="modal-input" name="route_name" value="${escapeHtml(v.route_name ?? '')}">
             <button type="submit" class="admin-btn-primary" style="width:100%;margin-top:4px;">Save changes</button>
         </form>
     `, async (form) => {
@@ -730,7 +742,7 @@ function openAssignDriverModal(v) {
 
     openModal(`
         <div class="modal-header">
-            <h2 class="modal-title">Assign driver to ${v.plate_number}</h2>
+            <h2 class="modal-title">Assign driver to ${escapeHtml(v.plate_number)}</h2>
             <button class="modal-close">✕</button>
         </div>
         <form class="modal-form">
@@ -739,7 +751,7 @@ function openAssignDriverModal(v) {
                 <option value="">— Select driver —</option>
                 ${drivers.map(u => `
                     <option value="${u.id}" ${u.id === v.user_id ? 'selected' : ''}>
-                        ${u.name}${u.vehicle && u.vehicle.id !== v.id ? ' (has another vehicle)' : ''}
+                        ${escapeHtml(u.name)}${u.vehicle && u.vehicle.id !== v.id ? ' (has another vehicle)' : ''}
                     </option>`).join('')}
             </select>
             <p style="font-size:11px;color:#9CA3AF;margin-top:4px;">
@@ -765,10 +777,10 @@ function openConfirmModal(title, body, onConfirm, disableConfirm = false) {
 
     box.innerHTML = `
         <div class="modal-header">
-            <h2 class="modal-title">${title}</h2>
+            <h2 class="modal-title">${escapeHtml(title)}</h2>
             <button class="modal-close">✕</button>
         </div>
-        <p style="font-size:13px;color:#6B7280;margin-bottom:16px;">${body}</p>
+        <p style="font-size:13px;color:#6B7280;margin-bottom:16px;">${escapeHtml(body)}</p>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="admin-btn-sm modal-close-btn">Cancel</button>
             ${!disableConfirm
@@ -1150,7 +1162,7 @@ function roleBadge(role) {
         admin:   ['#EEEDFE', '#534AB7', 'Admin'],
     };
     const [bg, color, label] = map[role] ?? ['#eee', '#555', role];
-    return `<span class="badge" style="background:${bg};color:${color};">${label}</span>`;
+    return `<span class="badge" style="background:${bg};color:${color};">${escapeHtml(label)}</span>`;
 }
 
 function gpsStatusBadge(status) {
@@ -1162,7 +1174,7 @@ function gpsStatusBadge(status) {
         shift_ended:  ['#F3F4F6', '#4B5563', 'Off shift'],
     };
     const [bg, color, label] = map[status] ?? ['#eee', '#555', status];
-    return `<span class="badge" style="background:${bg};color:${color};">${label}</span>`;
+    return `<span class="badge" style="background:${bg};color:${color};">${escapeHtml(label)}</span>`;
 }
 
 function endReasonBadge(reason) {
@@ -1173,7 +1185,7 @@ function endReasonBadge(reason) {
         auto:   ['#FEF3C7', '#92400E', 'Auto-ended'],
     };
     const [bg, color, label] = map[reason] ?? ['#eee', '#555', reason];
-    return `<span class="badge" style="background:${bg};color:${color};">${label}</span>`;
+    return `<span class="badge" style="background:${bg};color:${color};">${escapeHtml(label)}</span>`;
 }
 
 function formatTimeAgo(iso) {
@@ -1192,11 +1204,7 @@ function formatDatetime(iso) {
 }
 // ─── Announcements ────────────────────────────────────────────────────────────
 
-const ROUTES = [
-    'Route A – Mangaldan',
-    'Route B – Calasiao',
-    'Route C – San Fabian',
-];
+const ROUTES = JSON.parse(document.getElementById('app')?.dataset.routes ?? '[]');
 
 function openSendAlertModal() {
     openModal(`
@@ -1219,7 +1227,7 @@ function openSendAlertModal() {
             <label class="modal-label">Scope</label>
             <select class="modal-input" name="route">
                 <option value="">All routes</option>
-                ${ROUTES.map(r => `<option value="${r}">${r}</option>`).join('')}
+                ${ROUTES.map(r => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('')}
             </select>
 
             <label class="modal-label">Expires</label>
@@ -1290,11 +1298,11 @@ async function openAnnouncementsListModal() {
         <div class="admin-announcement-row" data-id="${a.id}">
             <div style="flex:1;min-width:0;">
                 <div style="font-size:12px;font-weight:700;color:#C2410C;margin-bottom:3px;">
-                    ${a.route ? a.route : 'All routes'}
+                    ${escapeHtml(a.route ? a.route : 'All routes')}
                     ${a.expires_at ? `· expires ${formatDatetime(a.expires_at)}` : '· manual deactivation'}
                 </div>
                 <p style="font-size:13px;color:#111827;margin:0;line-height:1.4;">${escapeHtml(a.message)}</p>
-                <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">Sent by ${a.created_by} · ${formatTimeAgo(a.created_at)}</div>
+                <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">Sent by ${escapeHtml(a.created_by)} · ${formatTimeAgo(a.created_at)}</div>
             </div>
             <button class="admin-btn-sm danger deactivate-btn" data-id="${a.id}" style="flex-shrink:0;">
                 Deactivate
@@ -1318,10 +1326,3 @@ async function openAnnouncementsListModal() {
     });
 }
 
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}

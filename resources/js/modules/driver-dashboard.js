@@ -320,11 +320,10 @@ function startGPS(vehicleId, userId, csrfToken) {
             // Fallback: HTTP every 5 s (persists to DB)
             if (now - lastServerSync > SERVER_INTERVAL) {
                 lastServerSync = now;
-                const route = document.getElementById('routeSelect')?.value;
                 fetch('/api/gps/update', {
                     method:  'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.stringify({ vehicle_id: vehicleId, latitude, longitude, speed, route_name: route }),
+                    body: JSON.stringify({ vehicle_id: vehicleId, latitude, longitude, speed }),
                 }).catch(err => console.warn('HTTP sync failed:', err));
             }
 
