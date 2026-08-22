@@ -10,6 +10,7 @@ use App\Models\Vehicle;
 use App\Events\VehicleStatusChanged;
 use App\Services\ShiftCompletionService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ShiftController extends Controller
 {
@@ -24,28 +25,47 @@ class ShiftController extends Controller
     {
         $validated = $request->validated();
 
-        $vehicle = Vehicle::where('user_id', Auth::id())->firstOrFail();
+        $vehicle = DB::transaction(function () use ($validated): ?Vehicle {
+            $vehicle = Vehicle::query()
+                ->where('user_id', Auth::id())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        if ($vehicle->shift_active) {
+            if ($vehicle->shift_active) {
+                return null;
+            }
+
+            $startedAt = now();
+
+            $vehicle->update([
+                'shift_active'     => true,
+                'shift_started_at' => $startedAt,
+                'shift_ended_at'   => null,
+                'is_active'        => false,
+                // A new shift must not inherit GPS state from the previous one.
+                // Coordinates are cleared as well so they cannot be presented as
+                // current before the first accepted fix for this shift.
+                'latitude'         => null,
+                'longitude'        => null,
+                'speed'            => null,
+                'last_seen'        => null,
+                'last_moved_at'    => null,
+                // Do not carry a legacy/unapproved value forward when a driver
+                // starts a shift without selecting a route.
+                'route_name'       => $validated['route_name']
+                    ?? VehicleRoute::tryFrom((string) $vehicle->route_name)?->value,
+            ]);
+
+            return $vehicle->fresh();
+        });
+
+        if (!$vehicle) {
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Shift is already active.',
             ], 422);
         }
 
-        $vehicle->update([
-            'shift_active'     => true,
-            'shift_started_at' => now(),
-            'shift_ended_at'   => null,
-            'is_active'        => false,
-            'last_moved_at'    => null,   // reset so idle/traffic clock starts fresh
-            // Do not carry a legacy/unapproved value forward when a driver
-            // starts a shift without selecting a route.
-            'route_name'       => $validated['route_name']
-                ?? VehicleRoute::tryFrom((string) $vehicle->route_name)?->value,
-        ]);
-
-        $vehicle->refresh();
         broadcast(new VehicleStatusChanged($vehicle));
 
         return response()->json([

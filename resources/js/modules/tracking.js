@@ -29,8 +29,8 @@
  *   disconnected→ show no-signal banner       | toast: "GPS signal lost"
  *   shift_ended → show full-screen overlay    | (no toast — overlay is prominent enough)
  */
-const GPS_STALE_MS   = 3 * 60 * 1000; // 3 minutes — mirrors backend threshold
-const STALE_CHECK_MS = 30 * 1000;     // check every 30s
+const FALLBACK_GPS_STALE_SECONDS = 180;
+const STALE_CHECK_MS = 30 * 1000; // check every 30s
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -71,7 +71,8 @@ export function initTracking() {
     initMap();
     loadInitialVehicle(vehicleId, container);
     initRealtime(vehicleId, expectedDriverId);
-    startStalenessChecker();
+    const gpsStaleSeconds = Number(container.dataset.gpsStaleSeconds) || FALLBACK_GPS_STALE_SECONDS;
+    startStalenessChecker(gpsStaleSeconds);
     startLastSeenTicker();
     bindShiftEndedDismiss();
 
@@ -897,16 +898,18 @@ function updateCapacityBadge(isFull) {
 // ─── Staleness checker ────────────────────────────────────────────────────────
 
 /**
- * Runs every 30 s. If no update has arrived for GPS_STALE_MS (3 min),
+ * Runs every 30 s. If no update has arrived for the configured stale period,
  * proactively switch to "disconnected" — giving students immediate feedback
  * before the server-side cron even fires.
  */
-function startStalenessChecker() {
+function startStalenessChecker(gpsStaleSeconds) {
+    const gpsStaleMs = gpsStaleSeconds * 1000;
+
     staleCheckInterval = setInterval(() => {
         if (lastWhisperTime === 0) return;
 
         const ms = Date.now() - lastWhisperTime;
-        if (ms >= GPS_STALE_MS) {
+        if (ms >= gpsStaleMs) {
             const iso = new Date(lastWhisperTime).toISOString();
             applyGpsStatus('disconnected', iso);
         }

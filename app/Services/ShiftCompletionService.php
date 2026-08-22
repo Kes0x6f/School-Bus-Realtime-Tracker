@@ -7,6 +7,7 @@ use App\Events\VehicleStatusChanged;
 use App\Models\Shift;
 use App\Models\Vehicle;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ShiftCompletionService
 {
@@ -39,6 +40,21 @@ class ShiftCompletionService
 
         if (!$lockedVehicle->shift_active) {
             return null;
+        }
+
+        if (!$lockedVehicle->shift_started_at) {
+            // Active rows without a start timestamp are malformed and cannot
+            // produce a meaningful duration. Repair them at completion time
+            // so every completion still has one valid history row.
+            Log::warning('[ShiftCompletionService] Repairing active shift without start timestamp', [
+                'vehicle_id' => $lockedVehicle->id,
+                'last_seen'  => $lockedVehicle->last_seen,
+                'is_active'  => $lockedVehicle->is_active,
+                'end_reason' => $reason instanceof ShiftEndReason ? $reason->value : $reason,
+            ]);
+
+            $lockedVehicle->update(['shift_started_at' => now()]);
+            $lockedVehicle->refresh();
         }
 
         $endReason = $reason instanceof ShiftEndReason

@@ -7,47 +7,64 @@ use App\Events\VehicleStatusChanged;
 use App\Services\ShiftCompletionService;
 use App\Enums\ShiftEndReason;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 class CheckInactiveVehicles extends Command
 {
     protected $signature   = 'vehicles:check-inactive';
-    protected $description = 'Marks vehicles as GPS-stale after 3 min, auto-ends shift after 20 min of no GPS updates.';
-
-    const GPS_STALE_SECONDS      = 180;  // 3 minutes
-    const SHIFT_AUTO_END_SECONDS = 1200; // 20 minutes
+    protected $description = 'Marks vehicles as GPS-stale and auto-ends inactive shifts using the configured policy.';
 
     public function handle(ShiftCompletionService $shiftCompletion)
     {
-        \Log::info('[CheckInactiveVehicles] Running', ['time' => now()]);
+        $now = now();
+        $gpsStaleSeconds = (int) config('shifts.gps_stale_seconds');
+        $shiftAutoEndSeconds = (int) config('shifts.auto_end_seconds');
+
+        Log::info('[CheckInactiveVehicles] Running', [
+            'time'             => $now,
+            'gps_stale_seconds' => $gpsStaleSeconds,
+            'auto_end_seconds'  => $shiftAutoEndSeconds,
+        ]);
 
         $vehicles = Vehicle::where('shift_active', true)->get();
 
         foreach ($vehicles as $vehicle) {
-            // FIX: guard both last_seen AND shift_started_at.
-            // Previously only last_seen was guarded — a null shift_started_at
-            // would throw "Call to member function diffInSeconds() on null"
-            // and crash the entire cron run, skipping all remaining vehicles.
-            if (!$vehicle->last_seen || !$vehicle->shift_started_at) {
+            if (!$vehicle->shift_started_at) {
+                Log::warning('[CheckInactiveVehicles] Recovering malformed active shift', [
+                    'vehicle_id'     => $vehicle->id,
+                    'last_seen'      => $vehicle->last_seen,
+                    'is_active'      => $vehicle->is_active,
+                    'shift_ended_at' => $vehicle->shift_ended_at,
+                ]);
+
+                // A missing start timestamp cannot produce a trustworthy
+                // duration. ShiftCompletionService repairs it to the cleanup
+                // time and records one zero-duration auto-ended shift.
+                $shiftCompletion->complete($vehicle, ShiftEndReason::AUTO);
                 continue;
             }
 
-            $secondsSinceUpdate       = $vehicle->last_seen->diffInSeconds(now());
-            $secondsSinceShiftStarted = $vehicle->shift_started_at->diffInSeconds(now());
+            // A GPS timestamp from before this shift belongs to the previous
+            // shift. Before the first fix, the shift start is the inactivity
+            // baseline so the scheduler can still end the shift.
+            $lastUpdate = $vehicle->last_seen;
+            if (!$lastUpdate || $lastUpdate->lt($vehicle->shift_started_at)) {
+                $lastUpdate = $vehicle->shift_started_at;
+            }
 
-            \Log::info('[CheckInactiveVehicles] Vehicle check', [
+            $secondsSinceUpdate = max(0, (int) $lastUpdate->diffInSeconds($now, false));
+
+            Log::info('[CheckInactiveVehicles] Vehicle check', [
                 'id'            => $vehicle->id,
                 'last_seen'     => $vehicle->last_seen,
+                'last_update'   => $lastUpdate,
                 'seconds_since' => $secondsSinceUpdate,
                 'is_active'     => $vehicle->is_active,
                 'shift_active'  => $vehicle->shift_active,
             ]);
 
-            // Threshold 2: Auto-end shift (20 min no GPS).
-            if (
-                $secondsSinceUpdate       >= self::SHIFT_AUTO_END_SECONDS &&
-                $secondsSinceShiftStarted >= self::SHIFT_AUTO_END_SECONDS
-            ) {
-                \Log::info('[CheckInactiveVehicles] Auto-ending shift', [
+            if ($secondsSinceUpdate >= $shiftAutoEndSeconds) {
+                Log::info('[CheckInactiveVehicles] Auto-ending shift', [
                     'vehicle_id'    => $vehicle->id,
                     'seconds_since' => $secondsSinceUpdate,
                 ]);
@@ -56,9 +73,8 @@ class CheckInactiveVehicles extends Command
                 continue;
             }
 
-            // Threshold 1: GPS stale (3 min no GPS).
-            if ($secondsSinceUpdate >= self::GPS_STALE_SECONDS && $vehicle->is_active) {
-                \Log::info('[CheckInactiveVehicles] Marking GPS stale / disconnected', [
+            if ($secondsSinceUpdate >= $gpsStaleSeconds && $vehicle->is_active) {
+                Log::info('[CheckInactiveVehicles] Marking GPS stale / disconnected', [
                     'vehicle_id'    => $vehicle->id,
                     'seconds_since' => $secondsSinceUpdate,
                 ]);

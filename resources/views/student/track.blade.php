@@ -14,6 +14,7 @@
     data-vehicle-id="{{ $jeepId }}"
     data-driver-id="{{ $vehicle->user_id }}"
     data-gps-status="{{ $vehicle->gps_status }}"
+    data-gps-stale-seconds="{{ config('shifts.gps_stale_seconds') }}"
     data-last-seen="{{ $vehicle->last_seen?->toISOString() }}"
     data-speed="{{ $vehicle->speed ?? 0 }}"
     data-route="{{ $vehicle->route_name ?? '' }}"
