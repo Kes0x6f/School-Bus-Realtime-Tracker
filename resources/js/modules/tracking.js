@@ -3,7 +3,7 @@ import {
     DEFAULT_TRAFFIC_THRESHOLD_MPS,
     deriveProvisionalGpsStatus,
     formatSpeedMps,
-} from './speed';
+} from './speed.js';
 
 /**
  * Tracking Page — tracking.js
@@ -150,18 +150,7 @@ function loadInitialVehicle(vehicleId, app) {
         credentials: 'same-origin',
         headers: { Accept: 'application/json' },
     })
-        .then(res => {
-            if (res.status === 401 || res.status === 403) {
-                window.location.assign('/');
-                return null;
-            }
-
-            if (!res.ok) {
-                throw new Error(`Vehicle request failed with status ${res.status}`);
-            }
-
-            return res.json();
-        })
+        .then(response => parseVehicleResponse(response))
         .then(vehicle => {
             if (!vehicle) return;
 
@@ -195,6 +184,22 @@ function loadInitialVehicle(vehicleId, app) {
             updateProximityInfo();
         })
         .catch(err => console.error("Failed to load vehicle:", err));
+}
+
+export async function parseVehicleResponse(
+    response,
+    redirect = path => window.location.assign(path),
+) {
+    if (response.status === 401 || response.status === 403) {
+        redirect('/');
+        return null;
+    }
+
+    if (!response.ok) {
+        throw new Error(`Vehicle request failed with status ${response.status}`);
+    }
+
+    return response.json();
 }
 
 // ─── Realtime ─────────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Models\Vehicle;
+use Illuminate\Support\Facades\RateLimiter;
 
 it('rejects coordinates outside the geographic boundaries', function (string $field, float $value) {
     $driver = User::factory()->driver()->create();
@@ -60,4 +61,31 @@ it('rejects gps updates until the driver starts a shift', function () {
         ])
         ->assertForbidden()
         ->assertJsonPath('message', 'No active shift. Start a shift before sending GPS updates.');
+});
+
+it('rate limits excessive GPS updates per driver', function () {
+    $driver = User::factory()->driver()->create();
+    $vehicle = Vehicle::factory()->assignedTo($driver)->onShift()->create();
+    $payload = [
+        'vehicle_id' => $vehicle->id,
+        'latitude' => 16.05,
+        'longitude' => 120.34,
+        'speed_mps' => 0,
+    ];
+    $throttleKey = sha1((string) $driver->getAuthIdentifier());
+    RateLimiter::clear($throttleKey);
+
+    try {
+        foreach (range(1, 30) as $requestNumber) {
+            $this->actingAs($driver)
+                ->postJson('/api/gps/update', $payload)
+                ->assertOk();
+        }
+
+        $this->actingAs($driver)
+            ->postJson('/api/gps/update', $payload)
+            ->assertTooManyRequests();
+    } finally {
+        RateLimiter::clear($throttleKey);
+    }
 });

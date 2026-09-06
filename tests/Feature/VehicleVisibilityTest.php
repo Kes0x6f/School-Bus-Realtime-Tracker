@@ -123,3 +123,28 @@ it('rejects inactive students from live vehicle endpoints', function () {
         ->assertForbidden()
         ->assertJsonPath('message', 'Your account has been deactivated.');
 });
+
+it('returns not found for an unknown vehicle without leaking a response contract', function () {
+    $student = User::factory()->student()->create();
+
+    $this->actingAs($student)
+        ->getJson('/api/vehicles/' . PHP_INT_MAX)
+        ->assertNotFound();
+});
+
+it('allows administrators to use every student tracking read', function () {
+    $admin = User::factory()->admin()->create();
+    $vehicle = makeTrackingVehicle();
+
+    $this->actingAs($admin)->get('/student/active-jeeps')->assertOk();
+    $this->actingAs($admin)->get('/student/track/' . $vehicle->id)->assertOk();
+    $this->actingAs($admin)->getJson('/api/vehicles/active')->assertOk();
+    $this->actingAs($admin)->getJson('/api/vehicles/' . $vehicle->id)->assertOk();
+    $this->actingAs($admin)
+        ->postJson('/student/change-password', [
+            'current_password' => 'password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ])
+        ->assertOk();
+});

@@ -56,23 +56,31 @@ function subscribeToGlobalChannel(container) {
     Echo.private('vehicles')
         .listen('.vehicle.status.changed', (e) => {
             console.log("STATUS EVENT:", e);
-            const vehicle = e.vehicle;
-
-            if (vehicle.gps_status === 'shift_ended') {
-                // Driver ended shift (manually or auto) — remove from list
-                removeVehicle(vehicle.id);
-                return;
-            }
-
-            const exists = document.querySelector(`[data-vehicle-id="${vehicle.id}"]`);
-
-            if (!exists) {
-                // New vehicle started a shift while page is open
-                addVehicle(container, vehicle);
-            } else {
-                updateCardStatus(vehicle.id, vehicle.gps_status, vehicle.last_seen, vehicle.speed_mps, vehicle.is_full, vehicle.route_name);
-            }
+            handleVehicleStatusChanged(container, e.vehicle);
         });
+}
+
+export function handleVehicleStatusChanged(container, vehicle) {
+    if (vehicle.gps_status === 'shift_ended') {
+        removeVehicle(vehicle.id);
+        return;
+    }
+
+    const exists = document.querySelector(`[data-vehicle-id="${vehicle.id}"]`);
+
+    if (!exists) {
+        addVehicle(container, vehicle);
+        return;
+    }
+
+    updateCardStatus(
+        vehicle.id,
+        vehicle.gps_status,
+        vehicle.last_seen,
+        vehicle.speed_mps,
+        vehicle.is_full,
+        vehicle.route_name,
+    );
 }
 
 // ─── Card management ─────────────────────────────────────────────────────────
@@ -123,7 +131,7 @@ function removeVehicle(id) {
  * routeName — when provided, updates the visible route label and data-route
  *             so the route filter keeps working after a mid-shift route change.
  */
-function updateCardStatus(id, gpsStatus, lastSeen, speedMps, is_full, routeName) {
+export function updateCardStatus(id, gpsStatus, lastSeen, speedMps, isFull, routeName) {
     const el = document.querySelector(`[data-vehicle-id="${id}"]`);
     if (!el) return;
 
@@ -139,10 +147,10 @@ function updateCardStatus(id, gpsStatus, lastSeen, speedMps, is_full, routeName)
 
     const occupancyBadge = el.querySelector(".occupancyBadge");
 
-    if (typeof is_full !== "undefined" && occupancyBadge) {
+    if (typeof isFull !== "undefined" && occupancyBadge) {
         const text = occupancyBadge.querySelector("p");
 
-        if (is_full) {
+        if (isFull) {
             occupancyBadge.style.backgroundColor = '#E53935';
             text.textContent = 'FULL';
             text.style.color = '#fff';
@@ -197,7 +205,7 @@ function resolveStatusStyle(gpsStatus, lastSeen) {
     }
 }
 
-function createCardContent(route, operator, isFull, gpsStatus, lastSeen) {
+export function createCardContent(route, operator, isFull, gpsStatus, lastSeen) {
     const { bgColor, textColor, label } = resolveStatusStyle(gpsStatus, lastSeen);
 
     const fragment = document.createDocumentFragment();

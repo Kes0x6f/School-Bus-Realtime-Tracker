@@ -13,12 +13,16 @@ it('logs active users in to the dashboard for their role', function (string $rol
         'email' => "{$role}@example.com",
     ]);
 
+    $this->get('/');
+    $previousSessionId = session()->getId();
+
     $this->post('/login', [
         'email' => $user->email,
         'password' => 'password',
     ])->assertRedirect($path);
 
-    expect(Auth::id())->toBe($user->id);
+    expect(Auth::id())->toBe($user->id)
+        ->and(session()->getId())->not->toBe($previousSessionId);
 })->with([
     'driver' => ['driver', '/driver/dashboard'],
     'student' => ['student', '/student/active-jeeps'],
@@ -55,6 +59,27 @@ it('does not establish a session for an inactive account', function () {
         ->assertSessionHasErrors(['email' => 'Your account has been deactivated.']);
 
     expect(Auth::check())->toBeFalse();
+});
+
+it('rate limits repeated login failures', function () {
+    $email = 'rate-limited@example.com';
+    $key = $email . '|127.0.0.1';
+    RateLimiter::clear($key);
+
+    foreach (range(1, 6) as $attempt) {
+        $this->post('/login', [
+            'email' => $email,
+            'password' => 'wrong-password',
+        ])->assertRedirect(route('login'));
+    }
+
+    $this->post('/login', [
+        'email' => $email,
+        'password' => 'wrong-password',
+    ])->assertRedirect(route('login'))
+        ->assertSessionHasErrors('email');
+
+    expect(RateLimiter::tooManyAttempts($key, 6))->toBeTrue();
 });
 
 it('enforces role boundaries on protected dashboards', function () {

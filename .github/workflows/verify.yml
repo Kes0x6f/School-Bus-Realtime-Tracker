@@ -25,7 +25,7 @@ jobs:
         with:
           php-version: '8.3'
           extensions: mbstring, sqlite3, pdo_sqlite
-          coverage: none
+          coverage: xdebug
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -52,7 +52,20 @@ jobs:
           php artisan migrate --force
 
       - name: Run PHP tests
-        run: composer test
+        run: |
+          mkdir -p storage/test-results
+          php artisan config:clear --ansi
+          php artisan test \
+            --log-junit storage/test-results/phpunit.xml \
+            --coverage-clover storage/test-results/coverage.xml
+
+      - name: Publish PHP test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: php-test-results
+          path: storage/test-results/
+          if-no-files-found: warn
 
       - name: Check PHP formatting
         run: vendor/bin/pint --test

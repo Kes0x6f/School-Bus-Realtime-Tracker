@@ -124,3 +124,50 @@ it('deactivates and reactivates a managed account while revoking access', functi
 
     expect($target->refresh()->is_active)->toBeTrue();
 });
+
+it('keeps one driver assigned to one vehicle during reassignment', function () {
+    $driver = User::factory()->driver()->create();
+    $otherDriver = User::factory()->driver()->create();
+    $oldVehicle = Vehicle::factory()->assignedTo($driver)->create();
+    $newVehicle = Vehicle::factory()->assignedTo($otherDriver)->create();
+
+    $this->actingAs($this->admin)
+        ->postJson('/admin/api/vehicles/' . $newVehicle->id . '/assign-driver', [
+            'user_id' => $driver->id,
+        ])
+        ->assertOk();
+
+    expect($oldVehicle->refresh()->user_id)->toBeNull()
+        ->and($newVehicle->refresh()->user_id)->toBe($driver->id)
+        ->and(Vehicle::where('user_id', $driver->id)->count())->toBe(1);
+});
+
+it('filters expired inactive and differently scoped announcements for students', function () {
+    $student = User::factory()->student()->create();
+    $vehicle = Vehicle::factory()->onShift()->create([
+        'route_name' => VehicleRoute::MANGALDAN->value,
+    ]);
+    $global = Announcement::factory()->create(['message' => 'Global active notice']);
+    $matching = Announcement::factory()
+        ->forRoute(VehicleRoute::MANGALDAN)
+        ->create(['message' => 'Matching route notice']);
+    $otherRoute = Announcement::factory()
+        ->forRoute(VehicleRoute::CALASIAO)
+        ->create(['message' => 'Other route notice']);
+    $expired = Announcement::factory()
+        ->expired()
+        ->create(['message' => 'Expired notice']);
+    $inactive = Announcement::factory()
+        ->inactive()
+        ->create(['message' => 'Inactive notice']);
+
+    $response = $this->actingAs($student)
+        ->get('/student/track/' . $vehicle->id)
+        ->assertOk();
+
+    $response->assertSee($global->message)
+        ->assertSee($matching->message)
+        ->assertDontSee($otherRoute->message)
+        ->assertDontSee($expired->message)
+        ->assertDontSee($inactive->message);
+});
