@@ -115,5 +115,10 @@ jobs:
           php artisan key:generate --force
           php artisan migrate --force
 
+      - name: Verify MySQL migration lifecycle
+        run: |
+          php artisan migrate:rollback --force
+          php artisan migrate --force
+
       - name: Verify shift lifecycle on MySQL
         run: php artisan test tests/Feature/ShiftCompletionTest.php
