@@ -5,17 +5,12 @@ use App\Http\Controllers\StudentController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\RateLimiter;
 use App\Models\Vehicle;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\AnnouncementController;
 use App\Enums\ShiftEndReason;
 use App\Services\ShiftCompletionService;
-
-Broadcast::routes(['middleware' => ['web', 'auth', 'active']]);
-
-require base_path('routes/channels.php');
 
 // ─── Public ───────────────────────────────────────────────────────────────────
 
@@ -93,7 +88,6 @@ Route::post('/logout', function (Request $request, ShiftCompletionService $shift
     // closes their browser without explicitly ending the shift.
     if ($user && $user->role === 'driver') {
         $vehicle = Vehicle::where('user_id', $user->id)
-                          ->where('shift_active', true)
                           ->first();
 
         if ($vehicle) {

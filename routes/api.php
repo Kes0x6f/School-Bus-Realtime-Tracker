@@ -5,16 +5,26 @@ use App\Http\Controllers\Api\GpsController;
 use App\Http\Controllers\Api\VehicleController;
 use App\Http\Controllers\Api\RouteController;
 
-// ─── Public read-only ─────────────────────────────────────────────────────────
-// Consumed by the student tracking page.
-// No sensitive data is returned — just vehicle position and status.
+// ─── Authenticated tracking reads ────────────────────────────────────────────
+// Consumed by the student tracking page and admin tracking tools.
+// Requires an authenticated, active student or administrator session.
+// The response is limited to tracking fields and excludes internal assignment
+// identifiers.
 //
 // throttle:60,1 → max 60 requests per minute per IP.
 // This is generous enough for the tracking page (which polls on location
 // events, not on a fixed interval) but blocks scrapers and abuse.
-Route::middleware('throttle:60,1')->group(function () {
-    Route::get('/vehicles/active', [VehicleController::class, 'activeVehicles']);
-    Route::get('/vehicles/{id}',   [VehicleController::class, 'show']);
+Route::middleware([
+    'web',
+    'auth',
+    'active',
+    'role:student,admin',
+    'throttle:60,1',
+])->group(function () {
+    Route::get('/vehicles/active', [VehicleController::class, 'activeVehicles'])
+        ->name('api.vehicles.active');
+    Route::get('/vehicles/{vehicle}', [VehicleController::class, 'show'])
+        ->name('api.vehicles.show');
 });
 
 // ─── Authenticated (web session) ──────────────────────────────────────────────

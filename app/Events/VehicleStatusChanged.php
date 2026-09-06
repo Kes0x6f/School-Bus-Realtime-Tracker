@@ -15,10 +15,12 @@ class VehicleStatusChanged implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public Vehicle $vehicle;
+    public ?int $shiftId;
 
-    public function __construct(Vehicle $vehicle)
+    public function __construct(Vehicle $vehicle, ?int $shiftId = null)
     {
         $this->vehicle = $vehicle;
+        $this->shiftId = $shiftId ?? $vehicle->current_shift_id;
     }
 
     public function broadcastOn(): array
@@ -41,10 +43,12 @@ class VehicleStatusChanged implements ShouldBroadcastNow
         return [
             'vehicle' => [
                 'id'               => $this->vehicle->id,
+                'shift_id'         => $this->shiftId,
                 'shift_active'     => $this->vehicle->shift_active,
                 'is_active'        => $this->vehicle->is_active,
                 'gps_status'       => $this->vehicle->gps_status, // moving|idle|disconnecte shift_ended
-                'speed'            => $this->vehicle->speed,
+                'speed_mps'        => $this->vehicle->speed_mps,
+                'speed_kph'        => $this->vehicle->speed_kph,
                 'last_seen'        => $this->vehicle->last_seen?->toISOString(),
                 'shift_started_at' => $this->vehicle->shift_started_at?->toISOString(),
                 'shift_ended_at'   => $this->vehicle->shift_ended_at?->toISOString(),

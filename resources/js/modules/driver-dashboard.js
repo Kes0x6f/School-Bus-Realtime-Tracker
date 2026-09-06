@@ -1,3 +1,9 @@
+import {
+    DEFAULT_MOVING_THRESHOLD_MPS,
+    DEFAULT_TRAFFIC_THRESHOLD_MPS,
+    deriveProvisionalGpsStatus,
+} from './speed';
+
 /**
  * driver-dashboard.js — with full inline feedback & sticky header
  *
@@ -17,6 +23,8 @@ let channel       = null;
 let channelReady  = false;
 let shiftActive   = false;
 let lastServerSync = 0;
+let movingSpeedThresholdMps = DEFAULT_MOVING_THRESHOLD_MPS;
+let trafficSpeedThresholdMps = DEFAULT_TRAFFIC_THRESHOLD_MPS;
 let broadcastStart = 0;          // wall-clock ms when broadcast started
 let broadcastTimer = null;       // setInterval handle for the duration counter
 
@@ -29,6 +37,10 @@ export function initDriverDashboard() {
     if (!app) return;
 
     shiftActive = app.dataset.shiftActive === '1';
+    movingSpeedThresholdMps = Number(app.dataset.movingSpeedThresholdMps)
+        || DEFAULT_MOVING_THRESHOLD_MPS;
+    trafficSpeedThresholdMps = Number(app.dataset.trafficSpeedThresholdMps)
+        || DEFAULT_TRAFFIC_THRESHOLD_MPS;
     syncShiftUI();
 
     if (!window.Echo) { console.error('Echo not loaded'); return; }
@@ -307,13 +319,15 @@ function startGPS(vehicleId, userId, csrfToken) {
             const now       = Date.now();
             const latitude  = position.coords.latitude;
             const longitude = position.coords.longitude;
-            const speed     = position.coords.speed ?? 0;
+            const speedMps   = position.coords.speed ?? null;
 
             // Primary: whisper (ultra-low latency)
             channel.whisper('location.update', {
                 vehicle_id: vehicleId,
                 driver_id:  window.authUserId,
-                latitude, longitude, speed,
+                latitude,
+                longitude,
+                speed_mps: speedMps,
                 timestamp: now,
             });
 
@@ -323,18 +337,22 @@ function startGPS(vehicleId, userId, csrfToken) {
                 fetch('/api/gps/update', {
                     method:  'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.stringify({ vehicle_id: vehicleId, latitude, longitude, speed }),
+                    body: JSON.stringify({
+                        vehicle_id: vehicleId,
+                        latitude,
+                        longitude,
+                        speed_mps: speedMps,
+                    }),
                 }).catch(err => console.warn('HTTP sync failed:', err));
             }
 
             // Mirror the 3-tier status logic from Vehicle::getGpsStatusAttribute()
             // and tracking.js so the strip always agrees with what students see.
-            //   ≥ 3   → moving   (clearly rolling)
-            //   ≥ 0.5 → traffic  (slow queue / red light — moved recently)
-            //   < 0.5 → idle     (stationary — waiting for passengers)
-            const derivedStatus = speed >= 3   ? 'moving'
-                                : speed >= 0.5 ? 'traffic'
-                                :                'idle';
+            const derivedStatus = deriveProvisionalGpsStatus(
+                speedMps,
+                movingSpeedThresholdMps,
+                trafficSpeedThresholdMps,
+            );
             updateStickyStrip(derivedStatus);
         },
         (error) => { console.error('GPS error:', error); setGpsStatusText('GPS Error'); },

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Http\Resources\ActiveVehicleCollection;
+use App\Http\Resources\VehicleTrackingResource;
 use App\Models\Vehicle;
-
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class VehicleController extends Controller
 {
@@ -29,28 +31,13 @@ class VehicleController extends Controller
      */
     public function activeVehicles()
     {
+        Gate::authorize('viewAny', Vehicle::class);
+
         $vehicles = Vehicle::with('user')
             ->where('shift_active', true)
-            ->get()
-            ->map(function ($vehicle) {
-                return [
-                    'id'               => $vehicle->id,
-                    'route_name'       => $vehicle->route_name,
-                    'is_full'          => $vehicle->is_full,
-                    'user_id'          => $vehicle->user_id,
-                    'user'             => $vehicle->user ? ['name' => $vehicle->user->name] : null,
-                    'latitude'         => $vehicle->latitude,
-                    'longitude'        => $vehicle->longitude,
-                    'speed'            => $vehicle->speed,
-                    'last_seen'        => $vehicle->last_seen?->toISOString(),
-                    'shift_active'     => $vehicle->shift_active,
-                    'is_active'        => $vehicle->is_active,
-                    'gps_status'       => $vehicle->gps_status,
-                    'shift_started_at' => $vehicle->shift_started_at?->toISOString(),
-                ];
-            });
- 
-        return response()->json($vehicles);
+            ->get();
+
+        return new ActiveVehicleCollection($vehicles);
     }
 
     /**
@@ -58,24 +45,11 @@ class VehicleController extends Controller
      * Used by the tracking page on initial load.
      * Includes shift state so tracking.js can decide what to show immediately.
      */
-    public function show($id)
+    public function show(Vehicle $vehicle)
     {
-        $vehicle = Vehicle::findOrFail($id);
- 
-        return response()->json([
-            'id'               => $vehicle->id,
-            'plate_number'     => $vehicle->plate_number,
-            'latitude'         => $vehicle->latitude,
-            'longitude'        => $vehicle->longitude,
-            'speed'            => $vehicle->speed,
-            'last_seen'        => $vehicle->last_seen?->toISOString(),
-            'shift_active'     => $vehicle->shift_active,
-            'is_active'        => $vehicle->is_active,
-            'gps_status'       => $vehicle->gps_status,
-            'shift_started_at' => $vehicle->shift_started_at?->toISOString(),
-            'shift_ended_at'   => $vehicle->shift_ended_at?->toISOString(),
-            'route_name'       => $vehicle->route_name,
-        ]);
+        Gate::authorize('view', $vehicle);
+
+        return new VehicleTrackingResource($vehicle);
     }
     //Updating the status of occupancy
     public function updateOccupancy(Request $request)
@@ -100,4 +74,3 @@ class VehicleController extends Controller
         ]);
     }
 }
- 

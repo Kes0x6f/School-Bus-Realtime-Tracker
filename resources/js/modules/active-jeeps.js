@@ -47,7 +47,7 @@ function subscribeToVehicleChannels(vehicleIds) {
                     return;
                 }
 
-                updateCardStatus(e.id, e.gps_status, e.last_seen, e.speed, e.is_full);
+                updateCardStatus(e.id, e.gps_status, e.last_seen, e.speed_mps, e.is_full);
             });
     });
 }
@@ -70,7 +70,7 @@ function subscribeToGlobalChannel(container) {
                 // New vehicle started a shift while page is open
                 addVehicle(container, vehicle);
             } else {
-                updateCardStatus(vehicle.id, vehicle.gps_status, vehicle.last_seen, vehicle.speed, vehicle.is_full, vehicle.route_name);
+                updateCardStatus(vehicle.id, vehicle.gps_status, vehicle.last_seen, vehicle.speed_mps, vehicle.is_full, vehicle.route_name);
             }
         });
 }
@@ -99,7 +99,7 @@ function addVehicle(container, vehicle) {
     // Subscribe per-vehicle for ongoing location updates
     Echo.private(`vehicle.${vehicle.id}`)
         .listen('.location.updated', (e) => {
-            updateCardStatus(e.id, e.gps_status, e.last_seen, e.speed, e.is_full);
+            updateCardStatus(e.id, e.gps_status, e.last_seen, e.speed_mps, e.is_full);
         });
 }
 
@@ -123,7 +123,7 @@ function removeVehicle(id) {
  * routeName — when provided, updates the visible route label and data-route
  *             so the route filter keeps working after a mid-shift route change.
  */
-function updateCardStatus(id, gpsStatus, lastSeen, speed, is_full, routeName) {
+function updateCardStatus(id, gpsStatus, lastSeen, speedMps, is_full, routeName) {
     const el = document.querySelector(`[data-vehicle-id="${id}"]`);
     if (!el) return;
 

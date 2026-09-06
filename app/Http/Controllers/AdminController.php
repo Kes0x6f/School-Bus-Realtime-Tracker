@@ -86,15 +86,19 @@ class AdminController extends Controller
         }
 
         $completedVehicle = null;
+        $completedShiftId = null;
+        $revokedUserId = null;
 
-        DB::transaction(function () use ($user, $shiftCompletion, &$completedVehicle): void {
+        DB::transaction(function () use (
+            $user,
+            $shiftCompletion,
+            &$completedVehicle,
+            &$completedShiftId,
+            &$revokedUserId,
+        ): void {
             $target = User::query()->lockForUpdate()->findOrFail($user->id);
             $target->update(['is_active' => false]);
-
-            // Notify any already-connected browser before its database
-            // session is removed. The server-side middleware remains the
-            // security boundary if the client does not disconnect promptly.
-            broadcast(new UserAccessRevoked($target->id));
+            $revokedUserId = $target->id;
 
             if ($target->role === 'driver') {
                 $vehicle = Vehicle::query()
@@ -103,10 +107,15 @@ class AdminController extends Controller
                     ->first();
 
                 if ($vehicle?->shift_active) {
-                    $completedVehicle = $shiftCompletion->completeWithinTransaction(
+                    $result = $shiftCompletion->completeWithinTransaction(
                         $vehicle,
                         ShiftEndReason::ACCOUNT_DEACTIVATED,
                     );
+
+                    if ($result->completed) {
+                        $completedVehicle = $result->vehicle;
+                        $completedShiftId = $result->shift?->id;
+                    }
                 }
             }
 
@@ -116,9 +125,15 @@ class AdminController extends Controller
                 ->delete();
         });
 
+        // Broadcast only after the transaction commits so connected clients
+        // never receive a revocation for state that was rolled back.
+        if ($revokedUserId) {
+            broadcast(new UserAccessRevoked($revokedUserId));
+        }
+
         // VehicleStatusChanged must only be emitted after the deactivation
         // transaction commits, so clients never see a rolled-back shift end.
-        $shiftCompletion->broadcastStatus($completedVehicle);
+        $shiftCompletion->broadcastStatus($completedVehicle, $completedShiftId);
 
         return response()->json(['status' => 'success']);
     }
@@ -289,7 +304,7 @@ class AdminController extends Controller
             'started_at'     => $s->started_at?->toISOString(),
             'ended_at'       => $s->ended_at?->toISOString(),
             'duration_human' => $s->duration_human,
-            'end_reason'     => $s->end_reason,
+            'end_reason'     => $s->end_reason?->value,
         ]);
 
         return response()->json($shifts);
@@ -302,11 +317,13 @@ class AdminController extends Controller
         $month = now()->month;
         $year  = now()->year;
 
-        $monthShifts = Shift::whereMonth('started_at', $month)
+        $monthShifts = Shift::whereNotNull('ended_at')
+                            ->whereMonth('started_at', $month)
                             ->whereYear('started_at', $year);
 
         // Shifts per day this week
-        $perDay = Shift::whereBetween('started_at', [now()->startOfWeek(), now()->endOfWeek()])
+        $perDay = Shift::whereNotNull('ended_at')
+            ->whereBetween('started_at', [now()->startOfWeek(), now()->endOfWeek()])
             ->select(DB::raw('DATE(started_at) as date'), DB::raw('COUNT(*) as count'))
             ->groupBy('date')
             ->orderBy('date')

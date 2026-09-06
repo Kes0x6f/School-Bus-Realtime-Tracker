@@ -7,11 +7,14 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * last_moved_at — timestamp of the most recent GPS update where speed ≥ 3 km/h.
+     * last_moved_at — timestamp of the most recent GPS update where speed_mps
+     * reaches the 3 km/h movement threshold.
      *
      * Used by Vehicle::getGpsStatusAttribute() to distinguish:
-     *   traffic — speed < 3 km/h but moved within the last 5 minutes
-     *   idle    — speed < 3 km/h and stationary for more than 5 minutes
+     *   traffic — speed_mps below the movement threshold but moved within the
+     *             last 5 minutes
+     *   idle    — speed_mps below the movement threshold and stationary for
+     *             more than 5 minutes
      *
      * Nullable: null means the jeep has not reached the movement threshold
      * since its current shift started (treated the same as idle).

@@ -58,7 +58,7 @@ it('returns JSON 403 for an inactive API caller', function () {
             'vehicle_id' => $vehicle->id,
             'latitude' => 16.05,
             'longitude' => 120.34,
-            'speed' => 0,
+            'speed_mps' => 0,
         ])
         ->assertStatus(403)
         ->assertJsonPath('message', 'Your account has been deactivated.');

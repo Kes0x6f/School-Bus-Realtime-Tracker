@@ -93,16 +93,18 @@ Driver browser
 |`id`|bigint|PK, auto-increment||
 |`plate_number`|varchar(20)|NOT NULL, unique||
 |`driver_name`|varchar(255)|nullable|Legacy — superseded by `user_id`|
-|`user_id`|bigint|nullable, FK → users|Assigned driver; null = unassigned|
+|`user_id`|bigint|nullable, FK → users (`ON DELETE SET NULL`)|Assigned driver; null = unassigned; vehicle history is retained if the user is deleted|
 |`route_name`|varchar(255)|nullable|Active route|
 |`latitude`|decimal(10,7)|nullable|Last known GPS latitude|
 |`longitude`|decimal(10,7)|nullable|Last known GPS longitude|
-|`speed`|decimal(8,2)|nullable|Reported in m/s by browser Geolocation API|
+|`speed_mps`|float|nullable|Canonical speed from browser Geolocation API, in meters per second|
+|`speed_kph`|computed|nullable|Presentation value derived as `speed_mps × 3.6`|
 |`last_seen`|timestamp|nullable|Time of last GPS update|
 |`is_active`|boolean|NOT NULL, default false|GPS fresh (within 3 min threshold)|
 |`shift_active`|boolean|NOT NULL, default false|Driver is currently on shift|
 |`shift_started_at`|timestamp|nullable||
 |`shift_ended_at`|timestamp|nullable||
+|`current_shift_id`|bigint|nullable, unique FK → shifts (`ON DELETE SET NULL`)|History row for the active shift|
 |`is_full`|boolean|NOT NULL, default false|Passenger capacity status|
 |`created_at` / `updated_at`|timestamp|||
 
@@ -111,37 +113,42 @@ Driver browser
 ```php
 if (!$this->shift_active) return 'shift_ended';
 if (!$this->is_active)   return 'disconnected';
-if (($this->speed ?? 0) < 1) return 'idle';
+if (($this->speed_mps ?? 0) < 0.8333) return 'idle';
 return 'moving';
 ```
 
-This accessor is appended to every serialised Vehicle instance via `$appends = ['gps_status']`.
+The computed `gps_status` and `speed_kph` values are appended to every
+serialised Vehicle instance via `$appends = ['gps_status', 'speed_kph']`.
+
+Speed contract: `speed_mps` is the canonical stored/API value from the browser
+Geolocation API. `speed_kph` is calculated as `speed_mps × 3.6` for display.
+The provisional client boundaries are `0.1389 m/s` (`0.5 km/h`) for traffic
+and `0.8333 m/s` (`3 km/h`) for moving; values are never converted before
+persistence. A `null` speed means the browser did not provide a reading;
+numeric `0` means a measured stationary reading.
 
 ### `shifts`
 
-Every completed shift writes one record here via `Shift::log($vehicle, $endReason)`.
+Every shift creates one row here at start. Completion updates that same row in
+the transaction that clears the vehicle's active state. Legacy active vehicles
+without `current_shift_id` are repaired by the completion service.
 
 |Column|Type|Constraints|Notes|
 |---|---|---|---|
 |`id`|bigint|PK, auto-increment||
 |`vehicle_id`|bigint|FK → vehicles||
 |`user_id`|bigint|nullable, FK → users|Driver at time of shift; nullable in case driver is deleted later|
-|`route_name`|varchar(255)|nullable|Snapshot of route at shift end|
-|`started_at`|timestamp|nullable|Copied from `vehicle->shift_started_at`|
+|`route_name`|varchar(255)|nullable|Snapshot of route at shift start|
+|`started_at`|timestamp|NOT NULL|Shift start time|
 |`ended_at`|timestamp|nullable|`now()` at time of logging|
 |`duration_seconds`|integer|nullable|`ended_at - started_at` in seconds|
-|`end_reason`|varchar(255)|nullable|`manual` / `logout` / `auto`|
+|`end_reason`|varchar(255)|nullable|`manual` / `logout` / `auto` / `account_deactivated`|
+|`active_marker`|boolean|nullable|`true` only for an open shift; combined with `vehicle_id` to enforce one active shift per vehicle|
 |`created_at` / `updated_at`|timestamp|||
 
-**`Shift::log()` static helper**
-
-Called at every shift-ending point before the vehicle row is updated:
-
-```php
-Shift::log($vehicle, 'manual');  // driver clicked End Shift
-Shift::log($vehicle, 'logout');  // driver logged out mid-shift
-Shift::log($vehicle, 'auto');    // cron: 20 min no GPS
-```
+All completion paths use `ShiftCompletionService`, which locks the vehicle,
+updates the open history row, clears `current_shift_id`, and commits both
+writes together. Repeated completion calls return an idempotent no-op.
 
 ### `announcements`
 
@@ -176,7 +183,7 @@ Historical GPS path log. Currently populated by the system but not yet consumed 
 |`id`|bigint|PK|
 |`vehicle_id`|bigint|FK → vehicles|
 |`latitude` / `longitude`|decimal||
-|`speed`|decimal|nullable|
+|`speed_mps`|float|nullable|Recorded in meters per second|
 |`recorded_at`|timestamp||
 
 ### Relationships summary
@@ -221,13 +228,21 @@ For local development change `wsPort`/`wssPort` to `8080` and `forceTLS` to `fal
 
 ### Channels
 
+Broadcasting is registered once from `bootstrap/app.php` through Laravel 12's
+`withBroadcasting()` configuration. That registration loads
+`routes/channels.php` and applies the `web`, `auth`, and `active` middleware to
+`/broadcasting/auth`. Web routes and service providers do not register the
+broadcast route or channel callbacks separately.
+
 |Channel|Type|Auth|Used by|
 |---|---|---|---|
-|`vehicle.{id}`|Private|Any authenticated user|Driver whispers; per-vehicle location + status events|
-|`vehicles`|Private|Any authenticated user|Global status changes (shift start/end, disconnected)|
+|`vehicle.{id}`|Private|Active student/admin, or assigned active driver|Driver whispers; per-vehicle location + status events|
+|`vehicles`|Private|Active student/admin/driver|Global status changes (shift start/end, disconnected)|
 |`announcements`|Public|None|Admin → all students, no auth needed|
 
-Channel authorisation in `channels.php` returns `true` for all authenticated users on the private channels. This is intentional — all roles need read access to vehicle channels (students track, admins monitor).
+Channel authorization in `routes/channels.php` additionally checks active
+account status and driver vehicle ownership. Students and administrators may
+monitor vehicle channels; drivers may only subscribe to their assigned vehicle.
 
 ### Events and what they carry
 
@@ -238,7 +253,8 @@ Channel authorisation in `channels.php` returns `true` for all authenticated use
   "id": 1,
   "latitude": 16.0509,
   "longitude": 120.3412,
-  "speed": 4.2,
+  "speed_mps": 3.0,
+  "speed_kph": 10.8,
   "last_seen": "2024-11-01T08:23:11.000000Z",
   "route_name": "Route A – Mangaldan",
   "shift_active": true,
@@ -254,10 +270,12 @@ Channel authorisation in `channels.php` returns `true` for all authenticated use
 {
   "vehicle": {
     "id": 1,
+    "shift_id": 1,
     "shift_active": false,
     "is_active": false,
     "gps_status": "shift_ended",
-    "speed": null,
+    "speed_mps": null,
+    "speed_kph": null,
     "last_seen": "2024-11-01T08:23:11.000000Z",
     "shift_started_at": "2024-11-01T06:00:00.000000Z",
     "shift_ended_at": "2024-11-01T08:23:40.000000Z",
@@ -305,12 +323,12 @@ The tracking page handles both: whispers for live map animation, broadcast for f
 
 ### States
 
-|State|`shift_active`|`is_active`|`speed`|Meaning|
+|State|`shift_active`|`is_active`|`speed_mps`|Meaning|
 |---|---|---|---|---|
 |`shift_ended`|`false`|any|any|No active shift|
 |`disconnected`|`true`|`false`|any|On shift, no recent GPS|
-|`idle`|`true`|`true`|`< 1 m/s`|On shift, GPS fresh, not moving|
-|`moving`|`true`|`true`|`≥ 1 m/s`|On shift, GPS fresh, moving|
+|`idle`|`true`|`true`|`< 0.8333 m/s`|On shift, GPS fresh, not moving|
+|`moving`|`true`|`true`|`≥ 0.8333 m/s`|On shift, GPS fresh, moving|
 
 ### Transitions
 
@@ -323,9 +341,9 @@ The tracking page handles both: whispers for live map animation, broadcast for f
     │  GPS update received (POST /api/gps/update)             │
     │  → is_active = true                                     │
     ▼                                                          │
-[idle]  ◄──────────────────────  speed < 1 m/s               │
+[idle]  ◄──────────────────────  speed_mps < 0.8333 m/s      │
     │                                                          │
-    │  speed ≥ 1 m/s                                          │
+    │  speed_mps ≥ 0.8333 m/s                                 │
     ▼                                                          │
 [moving]                                                       │
     │                                                          │
@@ -336,7 +354,7 @@ The tracking page handles both: whispers for live map animation, broadcast for f
     │
     │  No GPS for SHIFT_AUTO_END_SECONDS (1200 s)
     │  → CheckInactiveVehicles cron
-    │  → Shift::log($vehicle, 'auto')
+    │  → ShiftCompletionService (transaction + row lock)
     │  → shift_active = false, is_active = false
     ▼
 [shift_ended]
@@ -465,10 +483,9 @@ When a driver logs out with an active shift, the shift is automatically ended:
 ```
 POST /logout
   │
-  if user.role === 'driver' && vehicle.shift_active
-    ├─ Shift::log($vehicle, 'logout')
-    ├─ vehicle.update(shift_active=false, is_active=false)
-    └─ broadcast(VehicleStatusChanged)
+if user.role === 'driver' && vehicle.shift_active
+    ├─ ShiftCompletionService (transaction + row lock)
+    └─ broadcast(VehicleStatusChanged) after commit
   │
   Auth::logout() + session invalidate
 ```
@@ -487,7 +504,12 @@ Applied via the middleware alias `role` registered in the application's middlewa
 
 ### API authentication
 
-The API routes under `Route::middleware(['web', 'auth'])` rely on the **web session** (cookie + CSRF token) rather than tokens or Sanctum. The frontend sends `credentials: 'same-origin'` and `X-CSRF-TOKEN` on every API fetch. This works because the SPA pages are served by the same Laravel origin.
+Protected API routes rely on the **web session** (cookie + CSRF token) rather
+than tokens or Sanctum. First-party tracking reads additionally require the
+`active` middleware and the `student,admin` role boundary. The frontend sends
+`credentials: 'same-origin'` and `Accept: application/json` on tracking reads;
+state-changing requests also send `X-CSRF-TOKEN`. This works because the SPA
+pages are served by the same Laravel origin.
 
 ---
 
@@ -598,7 +620,7 @@ For each active-shift vehicle:
   ├─ secondsSinceShiftStarted = shift_started_at->diffInSeconds(now())
   │
   ├─ if secondsSinceUpdate >= 1200 && secondsSinceShiftStarted >= 1200
-  │     → Shift::log($vehicle, 'auto')
+  │     → ShiftCompletionService (transaction + row lock)
   │     → vehicle.update(shift_active=false, shift_ended_at=now(), is_active=false)
   │     → broadcast VehicleStatusChanged
   │     → continue  (skip threshold 1 check)
@@ -706,12 +728,15 @@ All mutation endpoints expect `Content-Type: application/json`. All responses re
   "vehicle_id": 1,
   "latitude":   16.0509,
   "longitude":  120.3412,
-  "speed":      4.2,
+  "speed_mps":  3.0,
   "route_name": "Route A – Mangaldan"
 }
 ```
 
-`vehicle_id` must match the authenticated driver's assigned vehicle — prevents GPS spoofing. `speed` and `route_name` are optional.
+`vehicle_id` must match the authenticated driver's assigned vehicle — prevents GPS spoofing. `speed_mps` and `route_name` are optional. `speed_mps` must be a non-negative browser GPS value no greater than `55.56` m/s.
+
+The legacy `speed` request field is rejected so clients cannot send an
+ambiguous unit.
 
 **Response (200):**
 
@@ -723,7 +748,7 @@ All mutation endpoints expect `Content-Type: application/json`. All responses re
 }
 ```
 
-**Side effects:** updates `latitude`, `longitude`, `speed`, `last_seen`, `is_active = true`, optionally `route_name`. If `is_active` was previously `false`, also broadcasts `VehicleStatusChanged`. Always broadcasts `VehicleLocationUpdated`.
+**Side effects:** updates `latitude`, `longitude`, `speed_mps`, `last_seen`, `is_active = true`, optionally `route_name`. If `is_active` was previously `false`, also broadcasts `VehicleStatusChanged`. Always broadcasts `VehicleLocationUpdated`. Broadcast payloads include `speed_mps` and derived `speed_kph`.
 
 ---
 
@@ -747,6 +772,7 @@ All mutation endpoints expect `Content-Type: application/json`. All responses re
   "message": "Shift started.",
   "data": {
     "id": 1,
+    "shift_id": 1,
     "shift_active": true,
     "shift_started_at": "2024-11-01T06:00:00.000000Z",
     "gps_status": "disconnected",
@@ -775,12 +801,16 @@ Note: `gps_status` is `disconnected` immediately after start because `is_active`
     "id": 1,
     "shift_active": false,
     "shift_ended_at": "2024-11-01T08:23:40.000000Z",
+    "shift_id": 1,
+    "already_ended": false,
     "gps_status": "shift_ended"
   }
 }
 ```
 
-**Side effects:** calls `Shift::log($vehicle, 'manual')` before updating the vehicle row.
+**Side effects:** completes the current `shifts` row and updates the vehicle
+inside one locked transaction. A repeated request returns `200` with
+`already_ended: true` and creates no duplicate history row.
 
 ---
 
@@ -824,7 +854,7 @@ Note: `gps_status` is `disconnected` immediately after start because `is_active`
 
 ### `GET /api/vehicles/active`
 
-**Auth:** none
+**Auth:** active student or admin session required
 
 **Response (200):** array of vehicle objects with `shift_active = true`.
 
@@ -834,11 +864,11 @@ Note: `gps_status` is `disconnected` immediately after start because `is_active`
     "id": 1,
     "route_name": "Route A – Mangaldan",
     "is_full": false,
-    "user_id": 3,
     "user": { "name": "Juan dela Cruz" },
     "latitude": 16.0509,
     "longitude": 120.3412,
-    "speed": 4.2,
+    "speed_mps": 3.0,
+    "speed_kph": 10.8,
     "last_seen": "2024-11-01T08:23:11.000000Z",
     "shift_active": true,
     "is_active": true,
@@ -847,6 +877,17 @@ Note: `gps_status` is `disconnected` immediately after start because `is_active`
   }
 ]
 ```
+
+---
+
+### `GET /api/vehicles/{vehicle}`
+
+**Auth:** active student or admin session required
+
+Returns the selected vehicle's tracking fields. An ended vehicle may still be
+retrieved by an authorized user so the tracking page can display its last
+known position and the shift-ended state. The response does not expose the
+assigned driver's internal `user_id`.
 
 ---
 
@@ -900,7 +941,7 @@ All API consumers are the same Laravel origin's own Blade pages. There is no ext
 
 ### Why is `gps_status` a computed accessor and not a stored column?
 
-`gps_status` is always fully derivable from `shift_active`, `is_active`, and `speed`. Storing it would create a redundancy that could desync — e.g. a direct database update to `is_active` would leave `gps_status` stale. The `$appends = ['gps_status']` directive ensures it is always fresh and always present on serialised Vehicle objects.
+`gps_status` is always fully derivable from `shift_active`, `is_active`, and `speed_mps`. Storing it would create a redundancy that could desync — e.g. a direct database update to `is_active` would leave `gps_status` stale. The `$appends = ['gps_status', 'speed_kph']` directive ensures the computed values are fresh and present on serialised Vehicle objects.
 
 ### Why does `VehicleStatusChanged` include `user`?
 
@@ -918,10 +959,10 @@ When a driver starts a shift while a student's active-jeeps page is already open
 
 |Area|Limitation|
 |---|---|
-|Channel auth|Both private channels return `true` for all authenticated users. Any logged-in student can technically subscribe to `vehicle.{id}` even for vehicles they're not tracking. No data is exposed beyond what the public tracking page already shows, so this is low risk.|
+|Channel auth|Active students and administrators may monitor vehicle channels; active drivers are restricted to their assigned vehicle.|
 |Route filter (live cards)|The route dropdown on active-jeeps is built from the server-rendered jeep list at page load. If a driver starts a shift on a new route after page load, that route won't appear in the dropdown (though the card will appear correctly).|
 |Announcement route sync|`announcements.js` reads the route filter once at `initAnnouncements()` call time. If a vehicle changes route mid-shift, the tracking page won't update which announcements are shown until a full page reload.|
-|GPS accuracy|Speed is reported in m/s by the browser Geolocation API. Values are device-dependent and can be unreliable at low speeds. The 1 m/s idle threshold may need tuning for slow urban traffic.|
+|GPS accuracy|Speed is reported in m/s by the browser Geolocation API and displayed in km/h. Values are device-dependent and can be unreliable at low speeds. The 0.8333 m/s (3 km/h) moving threshold may need tuning for slow urban traffic.|
 |No offline queue|If the driver loses connectivity, GPS updates are lost. The staleness checker marks the vehicle disconnected after 3 minutes. There is no offline buffer or retry queue.|
 |Shift history UI|The `locations` table records every GPS ping for future route-history replay, but no UI for this exists yet.|
 |Admin tab staleness|Admin dashboard tabs load data once and don't refresh. Data shown in Users / Vehicles / Shifts tabs can become stale if the admin leaves the page open for an extended period.|

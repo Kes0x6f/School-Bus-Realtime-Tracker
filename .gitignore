@@ -16,6 +16,11 @@
 /public/build
 /public/hot
 /public/storage
+# Compiled Blade views belong in storage/framework/views, never in public.
+/public/*storage*framework*views/
+# Keep the public PHP allow-list limited to Laravel's front controller.
+/public/**/*.php
+!/public/index.php
 /storage/*.key
 /storage/pail
 /vendor

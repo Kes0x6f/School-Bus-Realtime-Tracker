@@ -1,3 +1,10 @@
+import {
+    DEFAULT_MOVING_THRESHOLD_MPS,
+    DEFAULT_TRAFFIC_THRESHOLD_MPS,
+    deriveProvisionalGpsStatus,
+    formatSpeedMps,
+} from './speed';
+
 /**
  * Tracking Page — tracking.js
  *
@@ -53,6 +60,8 @@ let jeepLatLng       = null;     // [NEW] { lat, lng } — updated every time je
 let userLatLng       = null;     // [NEW] { lat, lng } — updated by watchPosition
 let userWatchId      = null;     // [NEW] geolocation watch handle
 let currentJeepStatus = null;   // tracks gps_status so the icon color can be updated in-place
+let movingSpeedThresholdMps = DEFAULT_MOVING_THRESHOLD_MPS;
+let trafficSpeedThresholdMps = DEFAULT_TRAFFIC_THRESHOLD_MPS;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -65,6 +74,11 @@ export function initTracking() {
 
     const vehicleId       = container.dataset.vehicleId;
     const expectedDriverId = parseInt(container.dataset.driverId);
+
+    movingSpeedThresholdMps = Number(container.dataset.movingSpeedThresholdMps)
+        || DEFAULT_MOVING_THRESHOLD_MPS;
+    trafficSpeedThresholdMps = Number(container.dataset.trafficSpeedThresholdMps)
+        || DEFAULT_TRAFFIC_THRESHOLD_MPS;
 
     seedInfoPanel(container);
 
@@ -110,7 +124,7 @@ function initMap() {
 function seedInfoPanel(app) {
     setInfoField('infoRoute',     app.dataset.route      || 'N/A');
     setInfoField('infoDriver',    app.dataset.driverName  || 'Unknown');
-    setInfoField('infoSpeed',     formatSpeed(parseFloat(app.dataset.speed || 0)));
+    setInfoField('infoSpeed',     formatSpeed(app.dataset.speedMps));
 
     const shiftStarted = app.dataset.shiftStarted;
     setInfoField('infoShiftStart', shiftStarted ? formatTime(shiftStarted) : '--');
@@ -132,8 +146,22 @@ function seedInfoPanel(app) {
 }
 
 function loadInitialVehicle(vehicleId, app) {
-    fetch(`/api/vehicles/${vehicleId}`)
-        .then(res => res.json())
+    fetch(`/api/vehicles/${vehicleId}`, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+    })
+        .then(res => {
+            if (res.status === 401 || res.status === 403) {
+                window.location.assign('/');
+                return null;
+            }
+
+            if (!res.ok) {
+                throw new Error(`Vehicle request failed with status ${res.status}`);
+            }
+
+            return res.json();
+        })
         .then(vehicle => {
             if (!vehicle) return;
 
@@ -152,7 +180,7 @@ function loadInitialVehicle(vehicleId, app) {
 
             // Refresh panel with fresher API data (in case Blade data was stale)
             setInfoField('infoRoute', vehicle.route_name || 'N/A');
-            setInfoField('infoSpeed', formatSpeed(vehicle.speed));
+            setInfoField('infoSpeed', formatSpeed(vehicle.speed_mps));
 
             lastSeenISO = vehicle.last_seen || null;
             if (lastSeenISO) {
@@ -183,7 +211,7 @@ function initRealtime(vehicleId, expectedDriverId) {
             onLocationReceived({
                 lat:       event.latitude,
                 lng:       event.longitude,
-                speed:     event.speed,
+                speedMps:   event.speed_mps,
                 gpsStatus: event.gps_status,
                 lastSeen:  event.last_seen,
                 isFull:    event.is_full,
@@ -204,21 +232,18 @@ function initRealtime(vehicleId, expectedDriverId) {
         const latency = Date.now() - data.timestamp;
         console.log("Whisper latency:", latency, "ms");
 
-        // speed from whisper; gps_status derived locally for immediate response
-        // Derive a provisional status from the whisper speed reading.
+        // Speed from whisper; gps_status is derived locally for immediate response.
         // Traffic vs idle requires server-side time context (last_moved_at),
         // so this is a best-effort split corrected by the next broadcast event:
-        //   ≥ 3 km/h → moving   (above GPS noise floor)
-        //   0.5–3    → traffic  (slow queue or red light)
-        //   < 0.5    → idle     (essentially stationary)
-        const wSpeed = data.speed ?? 0;
-        const derivedStatus = wSpeed >= 3   ? 'moving'
-                            : wSpeed >= 0.5 ? 'traffic'
-                            :                 'idle';
+        const derivedStatus = deriveProvisionalGpsStatus(
+            data.speed_mps,
+            movingSpeedThresholdMps,
+            trafficSpeedThresholdMps,
+        );
         onLocationReceived({
             lat:       data.latitude,
             lng:       data.longitude,
-            speed:     data.speed,
+            speedMps:   data.speed_mps,
             gpsStatus: derivedStatus,
             lastSeen:  null, // whisper doesn't carry a DB-persisted last_seen
             isFull:    undefined,
@@ -262,7 +287,7 @@ function initRealtime(vehicleId, expectedDriverId) {
 
 // ─── Location received ────────────────────────────────────────────────────────
 
-function onLocationReceived({ lat, lng, speed, gpsStatus, lastSeen, isFull, route }) {
+function onLocationReceived({ lat, lng, speedMps, gpsStatus, lastSeen, isFull, route }) {
     lastWhisperTime = Date.now();
 
     if (lastSeen) lastSeenISO = lastSeen;
@@ -274,7 +299,7 @@ function onLocationReceived({ lat, lng, speed, gpsStatus, lastSeen, isFull, rout
     jeepLatLng = { lat, lng };
     updateProximityInfo();
 
-    setInfoField('infoSpeed', formatSpeed(speed));
+    setInfoField('infoSpeed', formatSpeed(speedMps));
     if (route !== undefined)  setInfoField('infoRoute', route || 'N/A');
     if (isFull !== undefined) updateCapacityBadge(isFull);
 
@@ -1045,9 +1070,7 @@ function formatTimeAgo(isoString) {
 }
 
 function formatSpeed(speed) {
-    const s = parseFloat(speed);
-    if (isNaN(s)) return '-- km/h';
-    return `${Math.round(s)} km/h`;
+    return formatSpeedMps(speed);
 }
 
 function formatTime(isoString) {

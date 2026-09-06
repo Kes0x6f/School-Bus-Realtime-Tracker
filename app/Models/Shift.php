@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Enums\ShiftEndReason;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Shift extends Model
 {
@@ -18,14 +18,15 @@ class Shift extends Model
         'ended_at',
         'duration_seconds',
         'end_reason',
+        'active_marker',
     ];
 
     protected $casts = [
-        'started_at' => 'datetime',
-        'ended_at'   => 'datetime',
+        'started_at'    => 'datetime',
+        'ended_at'      => 'datetime',
+        'end_reason'    => ShiftEndReason::class,
+        'active_marker' => 'boolean',
     ];
-
-    // ─── Relationships ────────────────────────────────────────────────────────
 
     public function vehicle()
     {
@@ -37,40 +38,13 @@ class Shift extends Model
         return $this->belongsTo(User::class);
     }
 
-    // ─── Accessors ────────────────────────────────────────────────────────────
-
     public function getDurationHumanAttribute(): string
     {
         if (!$this->duration_seconds) return '--';
-        $h = intdiv($this->duration_seconds, 3600);
-        $m = intdiv($this->duration_seconds % 3600, 60);
-        return $h > 0 ? "{$h}h {$m}m" : "{$m}m";
-    }
 
-    // ─── Static helper ────────────────────────────────────────────────────────
+        $hours = intdiv($this->duration_seconds, 3600);
+        $minutes = intdiv($this->duration_seconds % 3600, 60);
 
-    /**
-     * Write a completed shift record.
-     * Call this at every shift-ending point before updating the vehicle row.
-     *
-     * end_reason: 'manual' | 'logout' | 'auto' | 'account_deactivated'
-     */
-    public static function log(Vehicle $vehicle, ShiftEndReason|string $endReason): self
-    {
-        $endReason = $endReason instanceof ShiftEndReason
-            ? $endReason->value
-            : ShiftEndReason::from($endReason)->value;
-
-        return self::create([
-            'vehicle_id'       => $vehicle->id,
-            'user_id'          => $vehicle->user_id,
-            'route_name'       => $vehicle->route_name,
-            'started_at'       => $vehicle->shift_started_at,
-            'ended_at'         => now(),
-            'duration_seconds' => $vehicle->shift_started_at
-                                    ? (int) $vehicle->shift_started_at->diffInSeconds(now())
-                                    : null,
-            'end_reason'       => $endReason,
-        ]);
+        return $hours > 0 ? "{$hours}h {$minutes}m" : "{$minutes}m";
     }
 }

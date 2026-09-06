@@ -50,15 +50,14 @@ class GpsController extends Controller
         $updateData = [
             'latitude'   => $validated['latitude'],
             'longitude'  => $validated['longitude'],
-            'speed'      => $validated['speed'] ?? null,
+            'speed_mps'  => $validated['speed_mps'] ?? null,
             'last_seen'  => now(),
             'is_active'  => true,
         ];
 
         // Stamp last_moved_at whenever the jeep is clearly rolling.
-        // 3 km/h sits above typical GPS noise at low speeds, so a stationary
-        // jeep with jittery readings doesn't accidentally reset the timer.
-        if (($validated['speed'] ?? 0) >= 3) {
+        // The threshold is expressed in m/s to match browser GPS input.
+        if (($validated['speed_mps'] ?? 0) >= Vehicle::MOVING_THRESHOLD_MPS) {
             $updateData['last_moved_at'] = now();
         }
 
@@ -75,6 +74,8 @@ class GpsController extends Controller
         return response()->json([
             'status'  => 'success',
             'message' => 'GPS update received',
+            // Preserve the existing full-vehicle response shape while the
+            // renamed speed fields and computed speed_kph are serialized.
             'data'    => $vehicle,
         ]);
     }

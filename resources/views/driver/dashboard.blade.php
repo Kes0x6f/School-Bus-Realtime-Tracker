@@ -9,6 +9,8 @@
      data-vehicle-id="{{ $vehicleId }}"
      data-user-id="{{ auth()->id() }}"
      data-shift-active="{{ $vehicle->shift_active ? '1' : '0' }}"
+     data-moving-speed-threshold-mps="{{ \App\Models\Vehicle::MOVING_THRESHOLD_MPS }}"
+     data-traffic-speed-threshold-mps="{{ \App\Models\Vehicle::TRAFFIC_THRESHOLD_MPS }}"
      data-is-full="{{ $vehicle->is_full ? '1' : '0' }}">
 
     {{-- ── FIXED HEADER (single navy bar — no white strip above it) ── --}}

@@ -15,8 +15,10 @@
     data-driver-id="{{ $vehicle->user_id }}"
     data-gps-status="{{ $vehicle->gps_status }}"
     data-gps-stale-seconds="{{ config('shifts.gps_stale_seconds') }}"
+    data-moving-speed-threshold-mps="{{ \App\Models\Vehicle::MOVING_THRESHOLD_MPS }}"
+    data-traffic-speed-threshold-mps="{{ \App\Models\Vehicle::TRAFFIC_THRESHOLD_MPS }}"
     data-last-seen="{{ $vehicle->last_seen?->toISOString() }}"
-    data-speed="{{ $vehicle->speed ?? 0 }}"
+    data-speed-mps="{{ $vehicle->speed_mps ?? '' }}"
     data-route="{{ $vehicle->route_name ?? '' }}"
     data-driver-name="{{ $vehicle->user->name ?? 'Unknown' }}"
     data-shift-started="{{ $vehicle->shift_started_at?->toISOString() }}"
@@ -136,7 +138,7 @@
             <div class="info-col">
                 <p class="info-label">SPEED</p>
                 <p id="infoSpeed" class="info-value">
-                    {{ $vehicle->speed !== null ? round($vehicle->speed) . ' km/h' : '-- km/h' }}
+                    {{ $vehicle->speed_kph !== null ? round($vehicle->speed_kph) . ' km/h' : '-- km/h' }}
                 </p>
             </div>
             <div class="info-col">

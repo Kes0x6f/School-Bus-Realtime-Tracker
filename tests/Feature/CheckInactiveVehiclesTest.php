@@ -54,7 +54,7 @@ it('resets GPS state when a new shift starts', function () {
         'is_active'     => true,
         'latitude'      => 16.05,
         'longitude'     => 120.34,
-        'speed'         => 28,
+        'speed_mps'     => 28,
         'last_seen'     => $now->copy()->subMinutes(5),
         'last_moved_at' => $now->copy()->subMinutes(5),
         'route_name'    => VehicleRoute::CALASIAO->value,
@@ -75,7 +75,7 @@ it('resets GPS state when a new shift starts', function () {
         ->and($vehicle->is_active)->toBeFalse()
         ->and($vehicle->latitude)->toBeNull()
         ->and($vehicle->longitude)->toBeNull()
-        ->and($vehicle->speed)->toBeNull()
+        ->and($vehicle->speed_mps)->toBeNull()
         ->and($vehicle->last_seen)->toBeNull()
         ->and($vehicle->last_moved_at)->toBeNull()
         ->and($vehicle->route_name)->toBe(VehicleRoute::MANGALDAN->value);

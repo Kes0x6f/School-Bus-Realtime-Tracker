@@ -14,12 +14,13 @@ class Location extends Model
         'vehicle_id',
         'latitude',
         'longitude',
-        'speed',
+        'speed_mps',
         'recorded_at'
     ];
 
     protected $casts = [
-        'recorded_at' => 'datetime'
+        'speed_mps'   => 'float',
+        'recorded_at' => 'datetime',
     ];
 
     public function vehicle()

@@ -99,7 +99,7 @@ Click any screenshot to open the full-size image.
 - See every active vehicle with live status: **● LIVE**, **● IDLE**, **◌ NO SIGNAL**
 - Filter by route
 - Tap a card to open a live-tracking map with a smoothly animated marker
-- Info panel: route, driver, speed, live last-seen ticker, shift start time, capacity
+- Info panel: route, driver, speed in km/h, live last-seen ticker, shift start time, capacity
 - Toast notifications on GPS status changes
 - Full-screen prompt when a shift ends
 - **Admin announcements** appear as dismissible banners instantly — no refresh needed
@@ -213,7 +213,7 @@ Log in at `http://localhost:8000` and create driver / student accounts from the 
 The driver's phone calls `navigator.geolocation.watchPosition`. Each fix is sent two ways at once:
 
 1. **WebSocket whisper** (instant, peer-to-peer) — the tracking page receives the position without it touching the server, giving sub-100 ms updates
-2. **HTTP POST every 5 s** — persists `lat`, `lng`, `speed`, `last_seen`, and `route_name` to the database and triggers a server broadcast for any clients that missed a whisper
+2. **HTTP POST every 5 s** — persists `lat`, `lng`, `speed_mps`, `last_seen`, and `route_name` to the database and triggers a server broadcast for any clients that missed a whisper
 
 ### GPS status lifecycle
 
@@ -251,12 +251,12 @@ Accounts with `is_active = false` are rejected at login even with correct creden
 ## API Reference
 
 <details>
-<summary>Public — no auth required</summary>
+<summary>Student/admin tracking — active authenticated session required</summary>
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/vehicles/active` | All vehicles currently on shift |
-| `GET` | `/api/vehicles/{id}` | Single vehicle detail |
+| `GET` | `/api/vehicles/{vehicle}` | Single vehicle detail, including last-known ended state |
 
 </details>
 

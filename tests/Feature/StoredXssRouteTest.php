@@ -60,7 +60,7 @@ it('does not accept route changes in GPS updates', function () {
             'vehicle_id' => $vehicle->id,
             'latitude' => 16.05,
             'longitude' => 120.34,
-            'speed' => 0,
+            'speed_mps' => 0,
             'route_name' => '<script>alert(1)</script>',
         ])
         ->assertOk();

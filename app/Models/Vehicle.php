@@ -9,6 +9,15 @@ class Vehicle extends Model
 {
     use HasFactory;
 
+    /**
+     * Browser Geolocation API speed arrives and is stored in meters per
+     * second. Convert to km/h only at presentation boundaries.
+     */
+    public const MOVING_THRESHOLD_MPS = 3 / 3.6;
+    public const TRAFFIC_THRESHOLD_MPS = 0.5 / 3.6;
+    public const MAX_SPEED_MPS = 55.5555555556;
+    public const KILOMETERS_PER_HOUR_PER_MPS = 3.6;
+
     protected $fillable = [
         'plate_number',
         'driver_name',
@@ -17,39 +26,58 @@ class Vehicle extends Model
         'shift_active',
         'shift_started_at',
         'shift_ended_at',
+        'current_shift_id',
         'latitude',
         'longitude',
-        'speed',
+        'speed_mps',
         'last_seen',
-        'last_moved_at',     // updated whenever speed ≥ 3 km/h — used for traffic vs idle
+        'last_moved_at',     // updated when speed_mps reaches the moving threshold
         'route_name',
         'is_full',
     ];
 
     protected $casts = [
         'last_seen'        => 'datetime',
+        'speed_mps'        => 'float',
         'shift_started_at' => 'datetime',
         'shift_ended_at'   => 'datetime',
+        'current_shift_id' => 'integer',
         'last_moved_at'    => 'datetime',
         'is_active'        => 'boolean',
         'shift_active'     => 'boolean',
         'is_full'          => 'boolean',
     ];
 
-    protected $appends = ['gps_status'];
+    protected $appends = ['gps_status', 'speed_kph'];
+
+    public static function speedMpsToKph(?float $speedMps): ?float
+    {
+        return $speedMps === null
+            ? null
+            : $speedMps * self::KILOMETERS_PER_HOUR_PER_MPS;
+    }
+
+    public function getSpeedKphAttribute(): ?float
+    {
+        return self::speedMpsToKph($this->speed_mps === null
+            ? null
+            : (float) $this->speed_mps);
+    }
 
     /**
      * Compute the GPS status from current speed and movement history.
      *
-     * moving      — speed ≥ 3 km/h  (clearly rolling)
-     * traffic     — speed < 3 km/h but moved within the last 5 min
+     * moving      — speed_mps ≥ MOVING_THRESHOLD_MPS (3 km/h)
+     * traffic     — speed_mps below the moving threshold but moved within
+     *               the last 5 min
      *               (stopped at a light or crawling in a queue)
-     * idle        — speed < 3 km/h AND no meaningful movement for > 5 min
+     * idle        — speed_mps below the moving threshold AND no meaningful
+     *               movement for > 5 min
      *               (waiting for passengers, parked at terminal, etc.)
      * disconnected — shift active but GPS stale (set by CheckInactiveVehicles)
      * shift_ended  — shift not active
      *
-     * The 3 km/h threshold sits above typical GPS noise at low speeds so a
+     * The 3 km/h threshold is expressed as MOVING_THRESHOLD_MPS so a
      * stationary jeep with jittery readings doesn't flicker into 'moving'.
      * The 5-minute window matches human intuition: a red light resolves in
      * seconds, a traffic jam in minutes; 5 min is a generous but fair cut-off.
@@ -59,9 +87,9 @@ class Vehicle extends Model
         if (!$this->shift_active) return 'shift_ended';
         if (!$this->is_active)   return 'disconnected';
 
-        $speed = $this->speed ?? 0;
+        $speedMps = $this->speed_mps ?? 0;
 
-        if ($speed >= 3) return 'moving';
+        if ($speedMps >= self::MOVING_THRESHOLD_MPS) return 'moving';
 
         // Speed is low — determine whether this is a temporary stop (traffic)
         // or a prolonged wait (idle) using last_moved_at.
@@ -90,5 +118,10 @@ class Vehicle extends Model
     public function shifts()
     {
         return $this->hasMany(Shift::class);
+    }
+
+    public function currentShift()
+    {
+        return $this->belongsTo(Shift::class, 'current_shift_id');
     }
 }

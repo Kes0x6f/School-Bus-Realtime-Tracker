@@ -5,6 +5,12 @@
 
     RewriteEngine On
 
+    # Only the Laravel front controller may be executed as PHP. This prevents
+    # cached views, uploaded files, or accidental PHP artifacts from running
+    # directly when Apache is configured with a PHP handler.
+    RewriteCond %{REQUEST_URI} !^/index\.php$
+    RewriteRule \.php$ - [F,L]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
@@ -23,3 +29,11 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+<FilesMatch "\.php$">
+    Require all denied
+</FilesMatch>
+
+<Files "index.php">
+    Require all granted
+</Files>
