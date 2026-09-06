@@ -5,10 +5,6 @@ set -euo pipefail
 unexpected=()
 
 while IFS= read -r -d '' file; do
-    # A local working tree may have unstaged deletions that are already part
-    # of the change. CI checks a clean checkout, so tracked files there exist.
-    [[ -e "$file" ]] || continue
-
     if [[ "$file" == public/* && "$file" == *.php && "$file" != "public/index.php" ]]; then
         unexpected+=("$file")
     fi

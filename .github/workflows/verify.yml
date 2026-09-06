@@ -20,6 +20,9 @@ jobs:
       - name: Check public PHP allow-list
         run: bash scripts/check-public-php.sh
 
+      - name: Check generated and sensitive artifact allow-list
+        run: bash scripts/check-repository-artifacts.sh
+
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -44,6 +47,14 @@ jobs:
           cp .env.example .env
           touch database/database.sqlite
           php artisan key:generate --force
+
+      - name: Verify compiled view isolation
+        run: |
+          LARAVEL_STORAGE_PATH="$PWD/public/forbidden-storage" \
+          VIEW_COMPILED_PATH="$PWD/public/forbidden-views" \
+          bash scripts/verify-view-compilation.sh
+          test ! -e public/forbidden-storage
+          test ! -e public/forbidden-views
 
       - name: Verify migration lifecycle
         run: |
